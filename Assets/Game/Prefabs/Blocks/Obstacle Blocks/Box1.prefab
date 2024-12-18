@@ -102,4 +102,3 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _data: {fileID: 11400000, guid: 55ebafd6fc4b0cf43892c37016aec62a, type: 2}
   _health: 2
-  _lowerHealthVersion: {fileID: 5845689990338492453, guid: ea995585e79df1c4a89c973396a4d4da, type: 3}

@@ -14,6 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   BlockType: 0
   ColorType: 3
+  BlastSound:
+  - {fileID: 8300000, guid: 714d17fdd63c2204184e7bd9c02da104, type: 3}
+  - {fileID: 8300000, guid: 2c7004fb9c36a3b49b413b8e2a240da7, type: 3}
+  - {fileID: 8300000, guid: 10a279d0aaef67f4197d475f06d364b6, type: 3}
   IconSprites:
   - {fileID: 21300000, guid: 6f1082808f0556c4cab49c78f8a0cc1d, type: 3}
   - {fileID: 21300000, guid: 9bd8422c9cfd843498d91e71879c33ba, type: 3}

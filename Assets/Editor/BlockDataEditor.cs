@@ -7,29 +7,29 @@ public class BlockDataEditor : Editor
     SerializedProperty blockTypeProperty;
     SerializedProperty colorTypeProperty;
     SerializedProperty iconSpritesProperty;
+    SerializedProperty blastSoundProperty;
 
     private void OnEnable()
     {
         blockTypeProperty = serializedObject.FindProperty("BlockType");
         colorTypeProperty = serializedObject.FindProperty("ColorType");
         iconSpritesProperty = serializedObject.FindProperty("IconSprites");
+        blastSoundProperty = serializedObject.FindProperty("BlastSound");
     }
 
     public override void OnInspectorGUI()
     {
         serializedObject.Update();
 
-        // Draw the BlockType field
         EditorGUILayout.PropertyField(blockTypeProperty);
-
-        // Draw the ColorType field
         EditorGUILayout.PropertyField(colorTypeProperty);
+        EditorGUILayout.PropertyField(blastSoundProperty);
 
-        // Check if BlockType is 'colored' to conditionally draw IconSprites
-        bool isColoredBlock = (BlockData.BLOCKTYPE)blockTypeProperty.enumValueIndex == BlockData.BLOCKTYPE.colored;
+        // Check if BlockType is 'Power' to conditionally draw IconSprites
+        bool isPowerBlock = (BlockData.BLOCKTYPE)blockTypeProperty.enumValueIndex == BlockData.BLOCKTYPE.Power;
 
-        // Disable the IconSprites field if BlockType is not 'colored'
-        EditorGUI.BeginDisabledGroup(!isColoredBlock);
+        // Disable the IconSprites field if BlockType is 'Power'
+        EditorGUI.BeginDisabledGroup(isPowerBlock);
         EditorGUILayout.PropertyField(iconSpritesProperty, new GUIContent("Icon Sprites"), true);
         EditorGUI.EndDisabledGroup();
 
