@@ -1,12 +1,15 @@
 using DG.Tweening;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public sealed class BoardCreator : MonoBehaviour
 {
     [SerializeField] private LevelBoardData _levelBoardData; // To Do: Get this level from levelManager or somewhere else
     private Block[,] _board;
-    private List<BlockGroup> _blockGroups;
+    private List<BlockGroup> _blockGroups = new List<BlockGroup>();
+    Dictionary<Vector2Int, ColoredBlock> _coloredBlocks = new Dictionary<Vector2Int, ColoredBlock>();
+    Dictionary<Vector2Int, ObstacleBlock> _obstacleBlocks = new Dictionary<Vector2Int, ObstacleBlock>();
 
     [Header("Thresholds")]
     [SerializeField] private int minBlastableBlockCount = 2;
@@ -14,45 +17,38 @@ public sealed class BoardCreator : MonoBehaviour
     private void Start()
     {
         CreateBoard(_levelBoardData.MaxRowCount, _levelBoardData.MaxColumnCount);
-        FindGroups();
-        SetGroupIDsAndChangeIcons();
+        FindColoredBlockGroups();
+        AssignGroupIDs();
     }
 
     private void CreateBoard(int rowCount, int colCount)
     {
         _board = new Block[colCount, rowCount];
-        _blockGroups = new List<BlockGroup>();
         BlockPool poolSingleton = BlockPool.Singleton;
 
         for(int i = 0; i < colCount; i++)
         {
             for(int j = 0; j < rowCount; j++)
             {
+                GameObject newObj;
+                Vector2Int loc = new Vector2Int(i, j);
+
                 if (Random.Range(0, 100) < 90) // Create colored blocks
                 {
-                    GameObject newObj = Instantiate(_levelBoardData.UsedColoredBlocks[Random.Range(0, _levelBoardData.UsedColoredBlocks.Length)].gameObject, new Vector3(i, j, 0), Quaternion.identity, transform);
+                    newObj = Instantiate(_levelBoardData.UsedColoredBlocks[Random.Range(0, _levelBoardData.UsedColoredBlocks.Length)].gameObject, new Vector3(i, j, 0), Quaternion.identity, transform);
                     ColoredBlock newColoredBlock = newObj.GetComponent<ColoredBlock>();
-                    _board[i, j] = newColoredBlock;
-                    poolSingleton.StoreColoredBlockToPool(newColoredBlock);
+                    SetBlockLoc(newColoredBlock, loc);
                 }
                 else // Create obstacle blocks
                 {
-                    GameObject newObj = Instantiate(_levelBoardData.UsedObstacleBlocks[Random.Range(0, _levelBoardData.UsedObstacleBlocks.Length)].gameObject, new Vector3(i, j, 0), Quaternion.identity, transform);
+                    newObj = Instantiate(_levelBoardData.UsedObstacleBlocks[Random.Range(0, _levelBoardData.UsedObstacleBlocks.Length)].gameObject, new Vector3(i, j, 0), Quaternion.identity, transform);
                     ObstacleBlock newObstacleBlock  = newObj.GetComponent<ObstacleBlock>();
-                    _board[i, j] = newObstacleBlock;
+                    SetBlockLoc(newObstacleBlock, loc);
                 }
             }
         }
 
         poolSingleton.SortColoredBlockPool();
-    }
-
-    private void Update()
-    {
-        if(Input.GetKeyDown(KeyCode.R))
-        {
-            ReCreate();
-        }
     }
 
     private void ReCreate()
@@ -67,13 +63,13 @@ public sealed class BoardCreator : MonoBehaviour
 
     #region Grouping Mechanic
 
-    private void FindGroups()
+    private void FindColoredBlockGroups()
     {
-        List<Vector2Int> candidateBlockList = new List<Vector2Int>();
+        List<Block> candidateBlockList = new List<Block>();
         List<BlockGroup> blockGroups = new List<BlockGroup>();
         BlockGroup.ResetIDCounter();
 
-        Queue<Vector2Int> queue = new Queue<Vector2Int>();
+        Queue<Block> queue = new Queue<Block>();
 
         int totalRows = _levelBoardData.MaxRowCount;
         int totalCols = _levelBoardData.MaxColumnCount;
@@ -81,93 +77,138 @@ public sealed class BoardCreator : MonoBehaviour
         bool[,] visited = new bool[totalCols, totalRows];
         BlockData.COLORTYPE targetColorType;
 
-        for (int i = 0; i < totalCols; i++)
-        {
-            for (int j = 0; j < totalRows; j++)
+        Dictionary<Vector2Int, ColoredBlock>.Enumerator pointer = _coloredBlocks.GetEnumerator();
+
+        while (pointer.MoveNext()) {
+            ColoredBlock coloredBlock = pointer.Current.Value;
+            Vector2Int coloredBlockLoc = pointer.Current.Key;
+            targetColorType = coloredBlock.Data.ColorType;
+
+            queue.Enqueue(coloredBlock);
+            visited[coloredBlockLoc.x, coloredBlockLoc.y] = true;
+
+            while (queue.Count > 0)
             {
-                if (visited[i, j]) { continue; }
-                if (_board[i, j] == null) { visited[i, j] = true; continue; }
+                Block currentBlock = queue.Dequeue();
+                candidateBlockList.Add(currentBlock);
 
-                targetColorType = _board[i, j].Data.ColorType;
-                if(targetColorType == BlockData.COLORTYPE.None) { visited[i, j] = true; continue; }
-
-                queue.Enqueue(new Vector2Int(i, j));
-                visited[i, j] = true;
-
-                while (queue.Count > 0)
+                foreach (Vector2Int direction in NeighborDirections)
                 {
-                    Vector2Int currentBlock = queue.Dequeue();
-                    candidateBlockList.Add(currentBlock);
+                    Vector2Int adjacentLoc = currentBlock.LocationOnBoard + direction;
 
-                    foreach (Vector2Int direction in NeighborDirections)
+                    if (IsWithinBounds(adjacentLoc.x, adjacentLoc.y) && !visited[adjacentLoc.x, adjacentLoc.y] && _board[adjacentLoc.x, adjacentLoc.y] != null && _board[adjacentLoc.x, adjacentLoc.y].Data.ColorType == targetColorType)
                     {
-                        int newRowIndex = currentBlock.x + direction.x;
-                        int newColIndex = currentBlock.y + direction.y;
-
-                        if(IsWithinBounds(newRowIndex, newColIndex) && !visited[newRowIndex, newColIndex] && _board[newRowIndex, newColIndex] != null && _board[newRowIndex, newColIndex].Data.ColorType == targetColorType)
-                        {
-                            queue.Enqueue(new Vector2Int(newRowIndex, newColIndex));
-                            visited[newRowIndex, newColIndex] = true;
-                        }
+                        queue.Enqueue(_board[adjacentLoc.x, adjacentLoc.y]);
+                        visited[adjacentLoc.x, adjacentLoc.y] = true;
                     }
                 }
-
-                int blockCount = candidateBlockList.Count;
-
-                if (blockCount >= minBlastableBlockCount)
-                {
-                    BlockGroup newGroup = new BlockGroup(candidateBlockList, targetColorType);
-                    blockGroups.Add(newGroup);
-                }
-                else
-                {
-                    foreach (Vector2Int blockLoc in candidateBlockList) // Change the sprites and groupIDs of blocks that are not on a group to default sprite
-                    {
-                        _board[blockLoc.x, blockLoc.y].GetComponent<ColoredBlock>().SetGroupIDandIcon(-1, blockCount);
-                    }
-                }
-
-                candidateBlockList.Clear(); // Reuse the list for the next group
             }
+
+            int blockCount = candidateBlockList.Count;
+
+            if (blockCount >= minBlastableBlockCount)
+            {
+                BlockGroup newGroup = new BlockGroup(candidateBlockList);
+                blockGroups.Add(newGroup);
+            }
+            else
+            {
+                foreach (Block block in candidateBlockList) // Change the sprites and groupIDs of blocks that are not on a group to default sprite
+                {
+                    block.SetGroupID(-1, blockCount);
+                }
+            }
+
+            candidateBlockList.Clear(); // Reuse the list for the next group
         }
 
         _blockGroups = blockGroups;
 
-        if (blockGroups.Count <= 0)
+        if (blockGroups.Count == 0 && _coloredBlocks.Count > minBlastableBlockCount) // && PowerBlockCount = 0 // Check whether there are no groups and enough colored blocks to blast
         {
-            IntentionalShuffle();
+            Debug.Log("Shuffle is available and needed");
+            //IntentionalShuffle();
+            //FindColoredBlockGroups();
         }
     }
 
-    private void SetGroupIDsAndChangeIcons()
+    private void AssignGroupIDs()
     {
         foreach (BlockGroup blockGroup in _blockGroups)
         {
-            int groupSize = blockGroup.Locations.Count;
-
-            for (int i = 0; i < groupSize; i++)
+            Debug.Log(blockGroup.PrintGroupInfo());
+            foreach(Block block in blockGroup.Blocks)
             {
-                Vector2Int blockLoc = blockGroup.Locations[i];
-
-                ColoredBlock coloredBlock = _board[blockLoc.x, blockLoc.y].GetComponent<ColoredBlock>();
-
-                if (coloredBlock != null)
-                {
-                    coloredBlock.SetGroupIDandIcon(blockGroup.GroupID, groupSize);
-                }
+                Debug.Log(block.LocationOnBoard);
+                block.SetGroupID(blockGroup.GroupID, blockGroup.Blocks.Count);
             }
         }
     }
 
-    private void IntentionalShuffle() // It swaps two of the blocks and randomize the location of the other blocks
+    /*
+    private void IntentionalShuffle()
     {
-        
+        ColoredBlock pivotBlock = _coloredBlocks[Random.Range(0, _coloredBlocks.Count)];  // Randomly select a block to be the "pivot" block
+        Block pivotBlock = _board[pivotPos.x, pivotPos.y];
+        BlockData.COLORTYPE targetColor = pivotBlock.Data.ColorType;
+
+        // Try to find a block of the same color to swap with
+        foreach (Vector2Int candidatePos in coloredBlockPositions)
+        {
+            if (candidatePos == pivotPos) continue;
+
+            Block candidateBlock = _board[candidatePos.x, candidatePos.y];
+            if (candidateBlock.Data.ColorType == targetColor)
+            {
+                // Attempt to swap the blocks to make them adjacent
+                if (TryMakeAdjacent(pivotPos, candidatePos))
+                {
+                    FindColoredBlockGroups(); // Re-run group detection
+                    return;
+                }
+                else
+                {
+
+                }
+            }
+        }
+
+        Debug.LogWarning("Could not find a suitable block to swap for creating a valid group.");
     }
 
-    private void SwapBlocks()
+    private bool TryMakeAdjacent(Vector2Int pivotPos, Vector2Int candidatePos, bool reversed = false) // Check if candidatePos can be made adjacent to pivotPos by swapping
     {
+        foreach (Vector2Int dir in NeighborDirections)
+        {
+            Vector2Int adjacentPos = pivotPos + dir;
 
+            if (_board[adjacentPos.x, adjacentPos.y] != null && _board[adjacentPos.x, adjacentPos.y].Data.BlockType != BlockData.BLOCKTYPE.Obstacle)
+            {
+                SwapBlocks(adjacentPos, candidatePos);
+                return true;
+            }
+        }
+
+        if (!reversed)
+        {
+            TryMakeAdjacent(candidatePos, pivotPos, true);
+        }
+
+        return false;
     }
+
+    private void SwapBlocks(Vector2Int pos1, Vector2Int pos2)
+    {
+        Block temp = _board[pos1.x, pos1.y];
+        _board[pos1.x, pos1.y] = _board[pos2.x, pos2.y];
+        _board[pos2.x, pos2.y] = temp;
+
+        // Swap their world positions for visual effect
+        Vector3 tempPosition = _board[pos1.x, pos1.y].transform.position;
+        _board[pos1.x, pos1.y].transform.position = _board[pos2.x, pos2.y].transform.position;
+        _board[pos2.x, pos2.y].transform.position = tempPosition;
+    }
+    */
 
     #endregion
 
@@ -175,37 +216,39 @@ public sealed class BoardCreator : MonoBehaviour
 
     public void BlastGroup(int groupID)
     {
-        Debug.Log("Blast " + groupID);
+        Debug.Log("Blasting group " + groupID);
         BlockGroup blastGroup = _blockGroups[groupID]; // The list is sequencial because we reset the ID counter in FindGroups method.
 
         DamageAdjacentObstacles(FindAdjacentObstacles(blastGroup));
 
-        foreach (Vector2Int loc in blastGroup.Locations)
+        foreach (Block block in blastGroup.Blocks)
         {
-            Destroy(_board[loc.x, loc.y].gameObject);
+            Vector2Int loc = block.LocationOnBoard;
+            _coloredBlocks.Remove(loc);
             _board[loc.x, loc.y] = null;
+            Destroy(block.gameObject);
         }
 
         // Get the blast initiator block's location and create the powerup (if powerup will ever be implemented)
         ApplyGravity();
-        FindGroups();
-        SetGroupIDsAndChangeIcons();
+        FindColoredBlockGroups();
+        AssignGroupIDs();
     }
 
     private Dictionary<Vector2Int, ObstacleBlock> FindAdjacentObstacles(BlockGroup blockGroup)
     {
         Dictionary<Vector2Int, ObstacleBlock> obstaclesToDamage = new Dictionary<Vector2Int, ObstacleBlock>();
 
-        foreach (Vector2Int blockLoc in blockGroup.Locations)
+        foreach (Block block in blockGroup.Blocks)
         {
             foreach (Vector2Int dir in NeighborDirections)
             {
-                Vector2Int adjacentPos = blockLoc + dir;
+                Vector2Int adjacentPos = block.LocationOnBoard + dir;
 
                 if (IsWithinBounds(adjacentPos.x, adjacentPos.y) && _board[adjacentPos.x, adjacentPos.y] != null)
                 {
                     Block adjacentBlock = _board[adjacentPos.x, adjacentPos.y];
-  
+
                     if (adjacentBlock.Data.BlockType == BlockData.BLOCKTYPE.Obstacle)
                     {
                         if (!obstaclesToDamage.ContainsKey(adjacentPos))
@@ -228,6 +271,7 @@ public sealed class BoardCreator : MonoBehaviour
             bool? isDestroyed = pointer.Current.Value?.TakeDamage();
             if (isDestroyed == true) {
                 Vector2Int blockLoc = pointer.Current.Key;
+                _obstacleBlocks.Remove(blockLoc);
                 _board[blockLoc.x, blockLoc.y] = null;
             }
         }
@@ -255,8 +299,16 @@ public sealed class BoardCreator : MonoBehaviour
                     // Move the block to the lowest available position if it's different from the current position
                     if (lowestAvailableRow != y)
                     {
-                        _board[x, lowestAvailableRow] = currentBlock;
-                        _board[x, y] = null;
+                        if(currentBlock.Data.BlockType == BlockData.BLOCKTYPE.Colored) // Update KeyValuePair for _coloredBlocks
+                        {
+                            Vector2Int blockLoc = new Vector2Int(x, lowestAvailableRow);
+
+                            UpdateBlockLoc(blockLoc, x, y);
+                        }
+                        else if(currentBlock.Data.BlockType == BlockData.BLOCKTYPE.Power)
+                        {
+                            // Same as above (if implemented)
+                        }
 
                         AnimateBlockFall(currentBlock, new Vector2(x, lowestAvailableRow));
                     }
@@ -308,26 +360,55 @@ public sealed class BoardCreator : MonoBehaviour
 
         for (int i = 0; i < missingBlockCount; i++)
         {
+            spawnRow = spawnRow + i;
             int targetRow = totalRows - missingBlockCount + i;
+            Vector2Int targetLoc = new Vector2Int(column, targetRow);
 
-            GameObject newBlockObj = Instantiate(_levelBoardData.UsedColoredBlocks[Random.Range(0, _levelBoardData.UsedColoredBlocks.Length)].gameObject, new Vector3(column, spawnRow, 0), Quaternion.identity, transform);
+            // To Do: Bottom two lines will be changed after pool
+            GameObject newObj = Instantiate(_levelBoardData.UsedColoredBlocks[Random.Range(0, _levelBoardData.UsedColoredBlocks.Length)].gameObject, new Vector3(column, spawnRow, 0), Quaternion.identity, transform);
+            ColoredBlock newColoredBlock = newObj.GetComponent<ColoredBlock>();
+            SetBlockLoc(newColoredBlock, targetLoc);
 
-            Block newBlock = newBlockObj.GetComponent<Block>();
-            _board[column, targetRow] = newBlock;
-
-            // Animate the scale from 0 to 1
-            newBlock.transform.localScale = Vector3.zero;
-            newBlock.transform.DOScale(Vector3.one, 0.3f);
-
-            // Tween to fall to the correct position
-            AnimateBlockFall(newBlock, new Vector2(column, targetRow), 1f);
+            AnimateBlockCreation(newColoredBlock);
+            AnimateBlockFall(newColoredBlock, new Vector2(column, targetRow), 0.8f);
         }
     }
 
-    private void AnimateBlockFall(Block block, Vector2 targetPosition, float duration = 0.5f)
+    private void UpdateBlockLoc(Vector2Int newLoc, int oldX = -1, int oldY = -1)
+    {
+        Vector2Int oldLoc = new Vector2Int(oldX, oldY);
+
+        ColoredBlock coloredBlock = _coloredBlocks.GetValueOrDefault(oldLoc);
+        _coloredBlocks.Remove(oldLoc);
+        _board[oldX, oldY] = null;
+
+        SetBlockLoc(coloredBlock, newLoc);
+    }
+
+    private void SetBlockLoc(ColoredBlock block, Vector2Int blockLoc)
+    {
+        block.LocationOnBoard = blockLoc;
+        _board[blockLoc.x, blockLoc.y] = block;
+        _coloredBlocks.Add(blockLoc, block);
+    }
+
+    private void SetBlockLoc(ObstacleBlock block, Vector2Int blockLoc)
+    {
+        block.LocationOnBoard = blockLoc;
+        _board[blockLoc.x, blockLoc.y] = block;
+        _obstacleBlocks.Add(blockLoc, block);
+    }
+
+    private void AnimateBlockCreation(Block block)
+    {
+        block.transform.localScale = Vector3.zero;
+        block.transform.DOScale(Vector3.one, 0.3f);
+    }
+
+    private void AnimateBlockFall(Block block, Vector2 targetPosition, float duration = 0.4f, Ease ease = Ease.OutBounce)
     {
         block.ColliderOnOff(false);
-        block.transform.DOMove(targetPosition, duration).SetEase(Ease.OutBounce).OnComplete(() =>
+        block.transform.DOMove(targetPosition, duration).SetEase(ease).OnComplete(() =>
         {
             block.ColliderOnOff(true);
         });
@@ -337,29 +418,28 @@ public sealed class BoardCreator : MonoBehaviour
 
     #region Helpers
 
-    struct BlockGroup // Basically, a group is a set of positions which corresponds to blocks with color type
+    struct BlockGroup // Basically, a group is a list of blocks with a groupID
     {
-        private static int _idCount;
+        private static int _idCounter;
         private int _groupID;
         public int GroupID { get { return _groupID; } }
 
-        public List<Vector2Int> Locations;
-        public BlockData.COLORTYPE ColorType;
+        private List<Block> _blocks;
+        public List<Block> Blocks { get { return _blocks; } }
 
-        public BlockGroup(List<Vector2Int> locations, BlockData.COLORTYPE colorType)
+        public BlockGroup(List<Block> blocks)
         {
-            _groupID = _idCount;
-            _idCount++;
-            Locations = new List<Vector2Int>();
-            Locations.AddRange(locations);
-            ColorType = colorType;
+            _groupID = _idCounter;
+            _idCounter++;
+            _blocks = new List<Block>();
+            _blocks.AddRange(blocks);
         }
 
-        public static void ResetIDCounter() { _idCount = 0; }
+        public static void ResetIDCounter() { _idCounter = 0; }
 
         public string PrintGroupInfo()
         {
-            string groupDesc = "Group ID: " + _groupID + " " + ColorType.ToString() + " location list count: " + Locations.Count;
+            string groupDesc = "Group ID: " + _groupID + " block count: " + _blocks.Count;
             return groupDesc;
         }
     }

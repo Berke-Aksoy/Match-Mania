@@ -9,7 +9,7 @@ public class ObstacleBlock : Block
     public bool? TakeDamage()
     {
         _health--;
-        PlayBlastSound();
+        PlayBlastSound(0.4f);
         return CheckHealth();
     }
 
@@ -22,14 +22,9 @@ public class ObstacleBlock : Block
         }
         else
         {
-            ShakeBox();
+            ShakeBlock();
             _spriteRenderer.sprite = Data.IconSprites[_health - 1];
             return false;
         }
-    }
-
-    private void ShakeBox()
-    {
-        transform.DOShakePosition(0.5f, strength: new Vector3(0.15f, 0.1f, 0), vibrato: 10, randomness: 10, fadeOut: true);
     }
 }
