@@ -1,7 +1,6 @@
 using DG.Tweening;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 
 public sealed class BoardCreator : MonoBehaviour
 {
@@ -127,6 +126,7 @@ public sealed class BoardCreator : MonoBehaviour
         if (blockGroups.Count == 0 && _coloredBlocks.Count > minBlastableBlockCount) // && PowerBlockCount = 0 // Check whether there are no groups and enough colored blocks to blast
         {
             Debug.Log("Shuffle is available and needed");
+            CountColors();
             //IntentionalShuffle();
             //FindColoredBlockGroups();
         }
@@ -145,35 +145,76 @@ public sealed class BoardCreator : MonoBehaviour
         }
     }
 
-    /*
+    #endregion
+
+    #region Shuffle Mechanic
+    
     private void IntentionalShuffle()
     {
-        ColoredBlock pivotBlock = _coloredBlocks[Random.Range(0, _coloredBlocks.Count)];  // Randomly select a block to be the "pivot" block
-        Block pivotBlock = _board[pivotPos.x, pivotPos.y];
-        BlockData.COLORTYPE targetColor = pivotBlock.Data.ColorType;
+        int usedColorTypeCount = _levelBoardData.UsedColoredBlocks.Length;
+        int[] colorCounts = new int[usedColorTypeCount];
+        List<ColoredBlock>[] coloredBlocksByType = new List<ColoredBlock>[usedColorTypeCount];
+        int selectedColorIndex = CountColors(usedColorTypeCount, ref colorCounts, ref coloredBlocksByType); // At first selected color index points to the most used color
+        int tryCount = 0;
 
-        // Try to find a block of the same color to swap with
-        foreach (Vector2Int candidatePos in coloredBlockPositions)
+        ColoredBlock pivotBlock = coloredBlocksByType[selectedColorIndex][Random.Range(0, colorCounts[selectedColorIndex])];  // Randomly select a colored block from the selected color type to be the "pivot" block
+
+        while (tryCount < usedColorTypeCount)
         {
-            if (candidatePos == pivotPos) continue;
+            if (colorCounts[selectedColorIndex] < minBlastableBlockCount) { return; }
 
-            Block candidateBlock = _board[candidatePos.x, candidatePos.y];
-            if (candidateBlock.Data.ColorType == targetColor)
+            foreach (ColoredBlock candidateBlock in coloredBlocksByType[selectedColorIndex])  // Try to find a block to swap with, they are already in same color therefore, no need to check color
             {
-                // Attempt to swap the blocks to make them adjacent
-                if (TryMakeAdjacent(pivotPos, candidatePos))
+                if (candidateBlock.LocationOnBoard == pivotBlock.LocationOnBoard) continue;
+
+                /*
+                if (TryMakeAdjacent(pivotPos, candidatePos)) // Attempt to swap the blocks to make them adjacent
                 {
                     FindColoredBlockGroups(); // Re-run group detection
                     return;
                 }
-                else
-                {
+                */
+            }
+        }
 
+        Debug.LogWarning("Could not find a suitable block to swap for creating a valid group. Try instantiating a new block.");
+    }
+    
+
+    private int CountColors(int usedColorTypeCount, ref int[] colorCounts, ref List<ColoredBlock>[] coloredBlocksByType)
+    {
+        int mostUsedColor = 0;
+        BlockData.COLORTYPE[] colorsToCompare = new BlockData.COLORTYPE[usedColorTypeCount];
+
+        for (int i = 0; i < usedColorTypeCount; i++)
+        {
+            colorsToCompare[i] = _levelBoardData.UsedColoredBlocks[i].Data.ColorType;
+        }
+
+        Dictionary<Vector2Int, ColoredBlock>.Enumerator pointer = _coloredBlocks.GetEnumerator();
+
+        while (pointer.MoveNext())
+        {
+            ColoredBlock coloredBlock = pointer.Current.Value;
+            BlockData.COLORTYPE currentColorType = coloredBlock.Data.ColorType;
+
+            for(int i = 0;i < colorsToCompare.Length; i++)
+            {
+                if (colorsToCompare[i] == currentColorType)
+                {
+                    coloredBlocksByType[i].Add(coloredBlock);
+                    colorCounts[i]++;
+                    break;
                 }
             }
         }
 
-        Debug.LogWarning("Could not find a suitable block to swap for creating a valid group.");
+        foreach(int value in colorCounts)
+        {
+            if(value > mostUsedColor) mostUsedColor = value;
+        }
+
+        return mostUsedColor;
     }
 
     private bool TryMakeAdjacent(Vector2Int pivotPos, Vector2Int candidatePos, bool reversed = false) // Check if candidatePos can be made adjacent to pivotPos by swapping
@@ -208,7 +249,6 @@ public sealed class BoardCreator : MonoBehaviour
         _board[pos1.x, pos1.y].transform.position = _board[pos2.x, pos2.y].transform.position;
         _board[pos2.x, pos2.y].transform.position = tempPosition;
     }
-    */
 
     #endregion
 
