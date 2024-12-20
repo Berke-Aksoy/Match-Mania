@@ -33,15 +33,6 @@ public abstract class Block : MonoBehaviour
         AudioManager.Singleton.PlaySound(Data.BlastSound[Random.Range(0, Data.BlastSound.Length)], volume);
     }
 
-    protected void ShakeBlock(float shakeDuration = 0.5f)
-    {
-        _boxCollider2D.enabled = false;
-        transform.DOShakePosition(shakeDuration, strength: new Vector3(0.15f, 0.1f, 0), vibrato: 10, randomness: 10, fadeOut: true).OnComplete(() =>
-        {
-            _boxCollider2D.enabled = true;
-        });
-    }
-
     public void Moving(float moveDuration)
     {
         _isMoving = true;

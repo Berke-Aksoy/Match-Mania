@@ -3,12 +3,13 @@ using DG.Tweening;
 
 public class ColoredBlock : Block, IInteractable
 {
+    [Header("Icon Conditions")]
     [SerializeField] private static int _condA = 4;  // Condition A
     [SerializeField] private static int _condB = 6; // Condition B
     [SerializeField] private static int _condC = 8;  // Condition C
     public void OnInteract()
     {
-        if(_groupID == -1) { ShakeBlock(); return; }
+        if(_groupID == -1) { BlockAnimator.ShakeBlock(this); return; }
 
         BoardCreator boardCreator = GetComponentInParent<BoardCreator>();
         if (boardCreator.BlastGroup(_groupID))
@@ -31,18 +32,6 @@ public class ColoredBlock : Block, IInteractable
         if (groupSize >= _condA) return 0;
         return 3;
     }
-
-    /*
-    private void PlayLandingParticles(Block block)
-    {
-        if (landingParticlePrefab != null)
-        {
-            ParticleSystem particles = Instantiate(landingParticlePrefab, block.transform.position, Quaternion.identity);
-            particles.Play();
-            Destroy(particles.gameObject, particles.main.duration);
-        }
-    }
-    */
 
     private void OnMouseDown()
     {

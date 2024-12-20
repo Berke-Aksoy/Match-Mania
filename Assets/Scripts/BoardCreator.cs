@@ -7,14 +7,31 @@ using UnityEngine;
 
 public sealed class BoardCreator : MonoBehaviour
 {
-    [SerializeField] private LevelBoardData _levelBoardData; // To Do: Get this level from levelManager or somewhere else
-    private Block[,] _board;
-    private List<BlockGroup> _blockGroups = new List<BlockGroup>();
-    Dictionary<Vector2Int, ColoredBlock> _coloredBlocks = new Dictionary<Vector2Int, ColoredBlock>();
-    Dictionary<Vector2Int, ObstacleBlock> _obstacleBlocks = new Dictionary<Vector2Int, ObstacleBlock>();
+    private static BoardCreator _instance;
+    public static BoardCreator Singleton { get => _instance; }
 
+    [SerializeField] private LevelBoardData _levelBoardData; // To Do: Get this level from levelManager or somewhere else
     [Header("Thresholds")]
     [SerializeField] private int minBlastableBlockCount = 2;
+
+    private Block[,] _board;
+    private List<BlockGroup> _blockGroups = new List<BlockGroup>();
+    public List<BlockGroup> BlockGroups { get => _blockGroups; }
+
+    private Dictionary<Vector2Int, ColoredBlock> _coloredBlocks = new Dictionary<Vector2Int, ColoredBlock>();
+    private Dictionary<Vector2Int, ObstacleBlock> _obstacleBlocks = new Dictionary<Vector2Int, ObstacleBlock>();
+
+    private void Awake()
+    {
+        if (_instance == null)
+        {
+            _instance = this;
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
+    }
 
     private void Start()
     {
@@ -306,8 +323,8 @@ public sealed class BoardCreator : MonoBehaviour
         _coloredBlocks.Add(pos1, (ColoredBlock)candidate);
         _coloredBlocks.Add(pos2, (ColoredBlock)adjacent);
 
-        AnimateBlockLocationChange(adjacent, pos2, 2f);
-        AnimateBlockLocationChange(candidate, pos1, 2f);
+        BlockAnimator.AnimateBlockLocationChange(adjacent, pos2, 2f);
+        BlockAnimator.AnimateBlockLocationChange(candidate, pos1, 2f);
     }
 
     #endregion
@@ -412,7 +429,7 @@ public sealed class BoardCreator : MonoBehaviour
                         Vector2Int newLoc = new Vector2Int(x, lowestAvailableRow);
 
                         SetBlockLoc(currentBlock, newLoc, true);
-                        AnimateBlockLocationChange(currentBlock, newLoc);
+                        BlockAnimator.AnimateBlockLocationChange(currentBlock, newLoc);
                     }
                 }
             }
@@ -471,8 +488,8 @@ public sealed class BoardCreator : MonoBehaviour
             Block newBlock = newObj.GetComponent<Block>();
             SetBlockLoc(newBlock, targetLoc);
 
-            AnimateBlockCreation(newBlock);
-            AnimateBlockLocationChange(newBlock, new Vector2(column, targetRow), 0.8f);
+            BlockAnimator.AnimateBlockCreation(newBlock);
+            BlockAnimator.AnimateBlockLocationChange(newBlock, new Vector2(column, targetRow), 0.8f);
         }
     }
 
@@ -517,21 +534,9 @@ public sealed class BoardCreator : MonoBehaviour
         _board[loc.x, loc.y] = null;
     }
 
-    private void AnimateBlockCreation(Block block)
-    {
-        block.transform.localScale = Vector3.zero;
-        block.transform.DOScale(Vector3.one, 0.3f);
-    }
-
-    private void AnimateBlockLocationChange(Block block, Vector2 targetPosition, float duration = 2f, Ease ease = Ease.OutBounce)
-    {
-        block.Moving(duration);
-        block.transform.DOMove(targetPosition, duration).SetEase(ease);
-    }
-
     #region Helpers
 
-    struct BlockGroup // Basically, a group is a list of blocks with a groupID
+    public struct BlockGroup // Basically, a group is a list of blocks with a groupID
     {
         private static int _idCounter;
         private int _groupID;

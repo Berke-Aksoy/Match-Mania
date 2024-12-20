@@ -22,7 +22,7 @@ public class ObstacleBlock : Block
         }
         else
         {
-            ShakeBlock();
+            BlockAnimator.ShakeBlock(this);
             _spriteRenderer.sprite = Data.IconSprites[_health - 1];
             return false;
         }
