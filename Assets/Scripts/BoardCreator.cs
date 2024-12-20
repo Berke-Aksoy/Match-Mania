@@ -1,5 +1,6 @@
 using DG.Tweening;
 using System.Collections.Generic;
+using System.Drawing;
 using UnityEngine;
 
 public sealed class BoardCreator : MonoBehaviour
@@ -124,11 +125,21 @@ public sealed class BoardCreator : MonoBehaviour
 
         _blockGroups = blockGroups;
 
-        if (blockGroups.Count == 0 && _coloredBlocks.Count > minBlastableBlockCount) // && PowerBlockCount = 0 // Check whether there are no groups and enough colored blocks to blast
+        if (blockGroups.Count == 0) // && PowerBlockCount = 0 // Check whether there are no groups and enough colored blocks to blast
         {
-            Debug.Log("Shuffle is available and needed");
-            //IntentionalShuffle();
-            //FindColoredBlockGroups();
+            if (_coloredBlocks.Count > minBlastableBlockCount)
+            {
+                Debug.Log("Shuffle is available and needed");
+                IntentionalShuffle();
+                FindColoredBlockGroups();
+            }
+            else // Imagine an edge case that the top row is full of obstacles and below rows are emptied out
+            {
+                // adjacent obstacles may be crushed until a group forms
+                // All obstacles may be destroyed
+                // If a row completely full of obstacles in a way that it will block the creation of missing blocks we may create new blocks under them (for that check every possible adjacent block including diagonal neighbors) it must be checked at every move not only here
+                // Let the user pass the level with a secret prize
+            }
         }
     }
 
@@ -151,46 +162,73 @@ public sealed class BoardCreator : MonoBehaviour
     
     private bool IntentionalShuffle() // Returns true if the shuffle is succesful
     {
-        int usedColorTypeCount = _levelBoardData.UsedColoredBlocks.Length;
-        int[] colorCounts = new int[usedColorTypeCount];
-        List<ColoredBlock>[] coloredBlocksByType = new List<ColoredBlock>[usedColorTypeCount];
-        int selectedColorIndex = CountColors(usedColorTypeCount, ref colorCounts, ref coloredBlocksByType); // At first selected color index points to the most used color
-        int tryCount = 0;
+        int selectedColorIndex = 0, tryCount = 0;
+        List<ColoredBlock>[] coloredBlocksByType;
+        coloredBlocksByType = CountBlocksOfColors(ref selectedColorIndex); // At first selected color index points to the most used color
+        int uniqueColorCount = coloredBlocksByType.Length;
 
-        ColoredBlock pivotBlock = coloredBlocksByType[selectedColorIndex][Random.Range(0, colorCounts[selectedColorIndex])];  // Randomly select a colored block from the selected color type to be the "pivot" block
+        int randomIndex = Random.Range(0, coloredBlocksByType[selectedColorIndex].Count);
+        ColoredBlock pivotBlock = coloredBlocksByType[selectedColorIndex][randomIndex];  // Randomly select a colored block from the selected color type to be the "pivot" block
 
-        while (tryCount < usedColorTypeCount)
+        while (tryCount < uniqueColorCount)
         {
-            if (colorCounts[selectedColorIndex] < minBlastableBlockCount) { return false; }
+            List<ColoredBlock> candidateBlocks = coloredBlocksByType[selectedColorIndex];
+            int candBlockCount = candidateBlocks.Count;
 
-            foreach (ColoredBlock candidateBlock in coloredBlocksByType[selectedColorIndex])  // Try to find a block to swap with, they are already in same color therefore, no need to check color
+            if (candBlockCount < minBlastableBlockCount) { return false; }
+
+            foreach (ColoredBlock candidateBlock in candidateBlocks)  // Try to find a block to swap with, they are already in same color therefore, no need to check color
             {
                 if (candidateBlock.LocationOnBoard == pivotBlock.LocationOnBoard) continue;
 
-                /*
-                if (TryMakeAdjacent(pivotPos, candidatePos)) // Attempt to swap the blocks to make them adjacent
+                if (TryMakeAdjacent(pivotBlock.LocationOnBoard, candidateBlock.LocationOnBoard)) // Attempt to swap the blocks to make them adjacent
                 {
                     return true;
                 }
-                */
+                else // Choose another same colored block as pivot
+                {
+                    randomIndex = (randomIndex + 1) % candBlockCount;
+                    pivotBlock = candidateBlocks[randomIndex];
+                }
             }
 
             tryCount++;
-            selectedColorIndex = (selectedColorIndex + 1) % usedColorTypeCount;
+            selectedColorIndex = (selectedColorIndex + 1) % uniqueColorCount;
         }
 
         Debug.LogWarning("Could not find a suitable block to swap for creating a valid group. Try instantiating a new block."); // To Do:
         return false;
     }
-    
-    private int CountColors(int usedColorTypeCount, ref int[] colorCounts, ref List<ColoredBlock>[] coloredBlocksByType)
-    {
-        int mostUsedColor = 0;
-        BlockData.COLORTYPE[] colorsToCompare = new BlockData.COLORTYPE[usedColorTypeCount];
 
-        for (int i = 0; i < usedColorTypeCount; i++)
+    private BlockData.COLORTYPE[] GetUniqueColorCount()
+    {
+        HashSet<BlockData.COLORTYPE> uniqueColors = new HashSet<BlockData.COLORTYPE>();
+
+        foreach (Block block in _coloredBlocks.Values)
         {
-            colorsToCompare[i] = _levelBoardData.UsedColoredBlocks[i].Data.ColorType;
+            if (uniqueColors.Count == _levelBoardData.UsedColoredBlocks.Length) { break; }
+            uniqueColors.Add(block.Data.ColorType); // Replace ColorType with the relevant property
+        }
+
+        BlockData.COLORTYPE[] colorsToCompare = new BlockData.COLORTYPE[uniqueColors.Count];
+
+        for (int j = 0; j < _levelBoardData.UsedColoredBlocks.Length; j++) // Find and store which colors to compare in the current shuffle situation because in a situation there may be less colors than used in level.
+        {
+            uniqueColors.TryGetValue(_levelBoardData.UsedColoredBlocks[j].Data.ColorType, out colorsToCompare[0]);
+        }
+        
+        return colorsToCompare;
+    }
+    
+    private List<ColoredBlock>[] CountBlocksOfColors(ref int selectedColorIndex)
+    {
+        BlockData.COLORTYPE[] colorsToCompare = GetUniqueColorCount();
+        int uniqueColorCount = colorsToCompare.Length;
+
+        List<ColoredBlock>[] coloredBlocksByType = new List<ColoredBlock>[uniqueColorCount];
+        for (int i = 0; i < uniqueColorCount; i++)
+        {
+            coloredBlocksByType[i] = new List<ColoredBlock>(); // Initialize the lists inside the array
         }
 
         Dictionary<Vector2Int, ColoredBlock>.Enumerator pointer = _coloredBlocks.GetEnumerator();
@@ -200,41 +238,36 @@ public sealed class BoardCreator : MonoBehaviour
             ColoredBlock coloredBlock = pointer.Current.Value;
             BlockData.COLORTYPE currentColorType = coloredBlock.Data.ColorType;
 
-            for(int i = 0;i < colorsToCompare.Length; i++)
+            for(int i = 0; i < uniqueColorCount; i++)
             {
                 if (colorsToCompare[i] == currentColorType)
                 {
                     coloredBlocksByType[i].Add(coloredBlock);
-                    colorCounts[i]++;
                     break;
                 }
             }
         }
 
-        foreach(int value in colorCounts)
+        foreach(List<ColoredBlock> blockList in coloredBlocksByType)
         {
-            if(value > mostUsedColor) mostUsedColor = value;
+            int count = blockList.Count;
+            if(count > selectedColorIndex) selectedColorIndex = count;
         }
 
-        return mostUsedColor;
+        return coloredBlocksByType;
     }
 
-    private bool TryMakeAdjacent(Vector2Int pivotPos, Vector2Int candidatePos, bool reversed = false)
+    private bool TryMakeAdjacent(Vector2Int pivotPos, Vector2Int candidatePos, bool reversed = false) // Returns true is blocks are made adjacent
     {
-        foreach (Vector2Int dir in NeighborDirections)
+        foreach (Vector2Int dir in NeighborDirections) // Try each block that is adjacent to pivot block
         {
             Vector2Int adjacentPos = pivotPos + dir;
 
-            if (_board[adjacentPos.x, adjacentPos.y] != null && _board[adjacentPos.x, adjacentPos.y].Data.BlockType != BlockData.BLOCKTYPE.Obstacle)
+            if (IsWithinBounds(adjacentPos.x, adjacentPos.y) && _board[adjacentPos.x, adjacentPos.y] != null && _board[adjacentPos.x, adjacentPos.y].Data.BlockType != BlockData.BLOCKTYPE.Obstacle) // Obstacle blocks are not swappable
             {
                 SwapBlocks(adjacentPos, candidatePos);
                 return true;
             }
-        }
-
-        if (!reversed)
-        {
-            TryMakeAdjacent(candidatePos, pivotPos, true);
         }
 
         return false;
@@ -242,18 +275,20 @@ public sealed class BoardCreator : MonoBehaviour
 
     private void SwapBlocks(Vector2Int pos1, Vector2Int pos2)
     {
-        //UpdateBlockLoc(pos2, pos1.x, pos1.y); // pos2 will take the location of pos1
+        _coloredBlocks.Remove(pos1);
+        _coloredBlocks.Remove(pos2);
 
-        //UpdateBlockLoc(pos2, pos1.x, pos1.y); // pos1 will take the location of pos2
+        Block adjacent = _board[pos1.x, pos1.y];
+        Block candidate = _board[pos2.x, pos2.y];
 
-        Block temp = _board[pos1.x, pos1.y];
-        _board[pos1.x, pos1.y] = _board[pos2.x, pos2.y];
-        _board[pos2.x, pos2.y] = temp;
+        _board[pos1.x, pos1.y] = candidate;
+        _board[pos2.x, pos2.y] = adjacent;
 
-        // Swap their world positions for visual effect
-        Vector3 tempPosition = _board[pos1.x, pos1.y].transform.position;
-        _board[pos1.x, pos1.y].transform.position = _board[pos2.x, pos2.y].transform.position;
-        _board[pos2.x, pos2.y].transform.position = tempPosition;
+        _coloredBlocks.Add(pos1, (ColoredBlock)candidate);
+        _coloredBlocks.Add(pos2, (ColoredBlock)adjacent);
+
+        AnimateBlockLocationChange(adjacent, pos2);
+        AnimateBlockLocationChange(candidate, pos1);
     }
 
     #endregion
@@ -348,7 +383,7 @@ public sealed class BoardCreator : MonoBehaviour
                         Vector2Int newLoc = new Vector2Int(x, lowestAvailableRow);
 
                         SetBlockLoc(currentBlock, newLoc, true);
-                        AnimateBlockFall(currentBlock, newLoc);
+                        AnimateBlockLocationChange(currentBlock, newLoc);
                     }
                 }
             }
@@ -408,9 +443,11 @@ public sealed class BoardCreator : MonoBehaviour
             SetBlockLoc(newBlock, targetLoc);
 
             AnimateBlockCreation(newBlock);
-            AnimateBlockFall(newBlock, new Vector2(column, targetRow), 0.8f);
+            AnimateBlockLocationChange(newBlock, new Vector2(column, targetRow), 0.8f);
         }
     }
+
+    #endregion
 
     private void SetBlockLoc(Block block, Vector2Int newLoc, bool doesFall = false)
     {
@@ -440,7 +477,7 @@ public sealed class BoardCreator : MonoBehaviour
         block.transform.DOScale(Vector3.one, 0.3f);
     }
 
-    private void AnimateBlockFall(Block block, Vector2 targetPosition, float duration = 0.4f, Ease ease = Ease.OutBounce)
+    private void AnimateBlockLocationChange(Block block, Vector2 targetPosition, float duration = 0.4f, Ease ease = Ease.OutBounce)
     {
         block.ColliderOnOff(false);
         block.transform.DOMove(targetPosition, duration).SetEase(ease).OnComplete(() =>
@@ -448,8 +485,6 @@ public sealed class BoardCreator : MonoBehaviour
             block.ColliderOnOff(true);
         });
     }
-
-    #endregion
 
     #region Helpers
 
