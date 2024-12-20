@@ -1,9 +1,7 @@
-using DG.Tweening;
 using System.Collections.Generic;
-using System.Drawing;
-using System.Linq;
-using Unity.VisualScripting;
 using UnityEngine;
+using MatchMania.Blocks;
+using static BlockData;
 
 public sealed class BoardCreator : MonoBehaviour
 {
@@ -20,7 +18,7 @@ public sealed class BoardCreator : MonoBehaviour
 
     private Dictionary<Vector2Int, ColoredBlock> _coloredBlocks = new Dictionary<Vector2Int, ColoredBlock>();
     private Dictionary<Vector2Int, ObstacleBlock> _obstacleBlocks = new Dictionary<Vector2Int, ObstacleBlock>();
-
+    private float fallDuration = 1f;
     private void Awake()
     {
         if (_instance == null)
@@ -116,9 +114,9 @@ public sealed class BoardCreator : MonoBehaviour
 
                 foreach (Vector2Int direction in NeighborDirections)
                 {
-                    Vector2Int adjacentLoc = currentBlock.LocationOnBoard + direction;
+                    Vector2Int adjacentLoc = currentBlock.Location + direction;
 
-                    if (IsWithinBounds(adjacentLoc.x, adjacentLoc.y) && !visited[adjacentLoc.x, adjacentLoc.y] && _board[adjacentLoc.x, adjacentLoc.y] != null && _board[adjacentLoc.x, adjacentLoc.y].Data.ColorType == targetColorType)
+                    if (IsWithinBounds(adjacentLoc) && !visited[adjacentLoc.x, adjacentLoc.y] && _board[adjacentLoc.x, adjacentLoc.y] != null && _board[adjacentLoc.x, adjacentLoc.y].Data.ColorType == targetColorType)
                     {
                         queue.Enqueue(_board[adjacentLoc.x, adjacentLoc.y]);
                         visited[adjacentLoc.x, adjacentLoc.y] = true;
@@ -145,14 +143,13 @@ public sealed class BoardCreator : MonoBehaviour
         }
 
         _blockGroups = blockGroups;
-
+        
         if (blockGroups.Count == 0) // && PowerBlockCount = 0 // Check whether there are no groups and enough colored blocks to blast
         {
             if (_coloredBlocks.Count > minBlastableBlockCount) // There are enough blocks to create a blastable group regardless of their color type
             {
                 Debug.Log("Shuffle is available and needed.");
-                //IntentionalShuffle();
-                //FindColoredBlockGroups();
+                StartCoroutine(WaitFallingBlocks());
             }
             else // Imagine an edge case that the top row is full of obstacles and below rows are emptied out
             {
@@ -164,14 +161,20 @@ public sealed class BoardCreator : MonoBehaviour
         }
     }
 
+    private System.Collections.IEnumerator WaitFallingBlocks()
+    {
+        yield return new WaitForSeconds(fallDuration + 0.1f);
+        IntentionalShuffle();
+        FindColoredBlockGroups();
+        AssignGroupIDs();
+    }
+
     private void AssignGroupIDs()
     {
         foreach (BlockGroup blockGroup in _blockGroups)
         {
-            Debug.Log(blockGroup.PrintGroupInfo());
             foreach(Block block in blockGroup.Blocks)
             {
-                Debug.Log(block.LocationOnBoard);
                 block.SetGroupID(blockGroup.GroupID, blockGroup.Blocks.Count);
             }
         }
@@ -181,150 +184,101 @@ public sealed class BoardCreator : MonoBehaviour
 
     #region Shuffle Mechanic
     
-    private bool IntentionalShuffle() // Returns true if the shuffle is succesful
+    private bool IntentionalShuffle() // Returns true if the shuffle is succesful.
     {
-        int selectedColorIndex = 0, tryCount = 0;
-        List<ColoredBlock>[] coloredBlocksByType;
-        coloredBlocksByType = CountBlocksOfColors(ref selectedColorIndex); // At first selected color index points to the most used color
-        int uniqueColorCount = coloredBlocksByType.Length;
-
-        int randomIndex = Random.Range(0, coloredBlocksByType[selectedColorIndex].Count);
-        ColoredBlock pivotBlock = coloredBlocksByType[selectedColorIndex][randomIndex];  // Randomly select a colored block from the selected color type to be the "pivot" block
+        int tryCount = 0;
+        List<List<ColoredBlock>> groupedBlocks = GroupBlocksByColor(); // At first selected color index points to the most used color
+        int uniqueColorCount = groupedBlocks.Count;
 
         while (tryCount < uniqueColorCount)
         {
-            List<ColoredBlock> candidateBlocks = coloredBlocksByType[selectedColorIndex];
-            int candBlockCount = candidateBlocks.Count;
+            int selGroupCount = groupedBlocks[tryCount].Count;
 
-            if (candBlockCount < minBlastableBlockCount) { return false; }
+            if (selGroupCount < minBlastableBlockCount) {
+                tryCount++;
+                continue;
+            }
 
-            foreach (ColoredBlock candidateBlock in candidateBlocks)  // Try to find a block to swap with, they are already in same color therefore, no need to check color
+            Debug.Log("uniqueColorCount: " + uniqueColorCount + " " + groupedBlocks[tryCount].Count);
+
+            for (int pivotIndex = 0; pivotIndex < selGroupCount; pivotIndex++)
             {
-                if (candidateBlock.LocationOnBoard == pivotBlock.LocationOnBoard) continue;
-                
-                if (TryMakeAdjacent(pivotBlock.LocationOnBoard, candidateBlock.LocationOnBoard))
+                Vector2Int? availableLoc = null;
+                availableLoc = FindValidAdjacentLoc(groupedBlocks[tryCount][pivotIndex].Location); // Find a valid spot for pivot
+
+                if (availableLoc.HasValue)
                 {
+                    int index = (pivotIndex + 1) % selGroupCount;
+                    Vector2Int moverBlockLoc = groupedBlocks[tryCount][index].Location; // Move the next block in the group to adjacent location of pivot block
+                    SwapBlocks((Vector2Int)availableLoc, moverBlockLoc);
                     return true;
                 }
-                else // Choose another same colored block as pivot
-                {
-                    randomIndex = (randomIndex + 1) % candBlockCount;
-                    pivotBlock = candidateBlocks[randomIndex];
-                }
-                
             }
 
             tryCount++;
-            selectedColorIndex = (selectedColorIndex + 1) % uniqueColorCount;
         }
 
-        Debug.LogWarning("Could not find a suitable block to swap for creating a valid group. Try instantiating a new block."); // To Do:
+        Debug.LogWarning("Could not find a suitable block to swap for creating a valid group. Try instantiating a new block in the place of an existing one"); // To Do:
         return false;
     }
 
-    private BlockData.COLORTYPE[] GetUniqueColorCount()
+    private List<List<ColoredBlock>> GroupBlocksByColor()
     {
-        List<BlockData.COLORTYPE> uniqueColors = new List<BlockData.COLORTYPE>();
+        Dictionary<COLORTYPE, List<ColoredBlock>> blocksByColorDict = new Dictionary<COLORTYPE, List<ColoredBlock>>();
 
-        foreach (Block block in _coloredBlocks.Values)
+        foreach (ColoredBlock block in _coloredBlocks.Values)
         {
-            BlockData.COLORTYPE colorType = block.Data.ColorType;
+            COLORTYPE colorType = block.Data.ColorType;
 
-            if (!uniqueColors.Contains(colorType)) // Add the color to the list if it's not already present
+            if (!blocksByColorDict.ContainsKey(colorType))
             {
-                uniqueColors.Add(colorType);
+                blocksByColorDict[colorType] = new List<ColoredBlock>();
             }
 
-            if (uniqueColors.Count == _levelBoardData.UsedColoredBlocks.Length) // Early exit if we've found all possible colors
-            {
-                break;
-            }
+            blocksByColorDict[colorType].Add(block);
         }
 
-        return uniqueColors.ToArray();
-    }
-    
-    private List<ColoredBlock>[] CountBlocksOfColors(ref int selectedColorIndex)
-    {
-        BlockData.COLORTYPE[] colorsToCompare = GetUniqueColorCount();
-        int uniqueColorCount = colorsToCompare.Length;
+        List<List<ColoredBlock>> groupedBlocks = new List<List<ColoredBlock>>(blocksByColorDict.Values);
 
-        List<ColoredBlock>[] coloredBlocksByType = new List<ColoredBlock>[uniqueColorCount];
-        for (int i = 0; i < uniqueColorCount; i++)
-        {
-            coloredBlocksByType[i] = new List<ColoredBlock>(); // Initialize the lists inside the array
-        }
-
-        Dictionary<Vector2Int, ColoredBlock>.Enumerator pointer = _coloredBlocks.GetEnumerator();
-
-        while (pointer.MoveNext())
-        {
-            ColoredBlock coloredBlock = pointer.Current.Value;
-            BlockData.COLORTYPE currentColorType = coloredBlock.Data.ColorType;
-
-            for(int i = 0; i < uniqueColorCount; i++)
-            {
-                if (colorsToCompare[i] == currentColorType)
-                {
-                    coloredBlocksByType[i].Add(coloredBlock);
-                    break;
-                }
-            }
-        }
-
-        int maxCount = 0;
-        for(int i = 0; i < coloredBlocksByType.Length; i++)
-        {
-            int curCount = coloredBlocksByType[i].Count;
-            Debug.Log(i + "th list Colored block count: " + curCount);
-            if (curCount > maxCount)
-            {
-                maxCount = curCount;
-                selectedColorIndex = i;
-            }
-        }
-
-        return coloredBlocksByType;
+        return groupedBlocks;
     }
 
-    private bool TryMakeAdjacent(Vector2Int pivotPos, Vector2Int candidatePos) // Returns true is blocks are made adjacent
+    private Vector2Int? FindValidAdjacentLoc(Vector2Int locToCheck)
     {
-        foreach (Vector2Int dir in NeighborDirections) // Try each block that is adjacent to pivot block
+        foreach (Vector2Int dir in NeighborDirections)
         {
-            Vector2Int adjacentPos = pivotPos + dir;
+            Vector2Int adjacentLoc = locToCheck + dir;
 
-            if (IsWithinBounds(adjacentPos.x, adjacentPos.y) && _board[adjacentPos.x, adjacentPos.y].Data.BlockType != BlockData.BLOCKTYPE.Obstacle) // Obstacle blocks are not swappable
+            if (IsWithinBounds(adjacentLoc)) // Obstacle blocks are not swappable
             {
-                if(_board[adjacentPos.x, adjacentPos.y] == null) // Try not to place the block in mid air
+                Block block = _board[adjacentLoc.x, adjacentLoc.y];
+                if (block == null) // Check this if block not to place the block in mid air
                 {
-                    adjacentPos += NeighborDirections[1]; // Look under it
-                    if (IsWithinBounds(adjacentPos.x, adjacentPos.y) && _board[adjacentPos.x, adjacentPos.y] == null) { continue; }
+                    Vector2Int underAdjacentLoc = adjacentLoc + NeighborDirections[1]; // Look under adjacent location
+                    if (IsWithinBounds(underAdjacentLoc) && _board[underAdjacentLoc.x, underAdjacentLoc.y] == null) { continue; } // If adjacent location is in mid air, it is not a valid location
+                }
+                else if(block.Data.BlockType == BlockData.BLOCKTYPE.Obstacle)
+                {
+                    continue;
                 }
 
-                SwapBlocks(adjacentPos, candidatePos);
-                return true;
+                return adjacentLoc;
             }
         }
 
-        return false;
+        return null;
     }
 
     private void SwapBlocks(Vector2Int pos1, Vector2Int pos2)
     {
-        _coloredBlocks.Remove(pos1);
-        _coloredBlocks.Remove(pos2);
-
         Block adjacent = _board[pos1.x, pos1.y];
-        Block candidate = _board[pos2.x, pos2.y];
+        Block mover = _board[pos2.x, pos2.y];
 
-        _board[pos1.x, pos1.y] = candidate;
-        _board[pos2.x, pos2.y] = adjacent;
+        SetBlockLoc(adjacent, pos2, false, true);
+        SetBlockLoc(mover, pos1, false, true);
 
-        _coloredBlocks.Add(pos1, (ColoredBlock)candidate);
-        _coloredBlocks.Add(pos2, (ColoredBlock)adjacent);
-
-        BlockAnimator.AnimateBlockLocationChange(adjacent, pos2, 2f);
-        BlockAnimator.AnimateBlockLocationChange(candidate, pos1, 2f);
+        BlockAnimator.AnimateBlockLocationChange(adjacent, pos2);
+        BlockAnimator.AnimateBlockLocationChange(mover, pos1);
     }
 
     #endregion
@@ -365,7 +319,6 @@ public sealed class BoardCreator : MonoBehaviour
         return true;
     }
 
-
     private Dictionary<Vector2Int, ObstacleBlock> FindAdjacentObstacles(BlockGroup blockGroup)
     {
         Dictionary<Vector2Int, ObstacleBlock> obstaclesToDamage = new Dictionary<Vector2Int, ObstacleBlock>();
@@ -374,17 +327,17 @@ public sealed class BoardCreator : MonoBehaviour
         {
             foreach (Vector2Int dir in NeighborDirections)
             {
-                Vector2Int adjacentPos = block.LocationOnBoard + dir;
+                Vector2Int adjacentLoc = block.Location + dir;
 
-                if (IsWithinBounds(adjacentPos.x, adjacentPos.y) && _board[adjacentPos.x, adjacentPos.y] != null)
+                if (IsWithinBounds(adjacentLoc) && _board[adjacentLoc.x, adjacentLoc.y] != null)
                 {
-                    Block adjacentBlock = _board[adjacentPos.x, adjacentPos.y];
+                    Block adjacentBlock = _board[adjacentLoc.x, adjacentLoc.y];
 
                     if (adjacentBlock.Data.BlockType == BlockData.BLOCKTYPE.Obstacle)
                     {
-                        if (!obstaclesToDamage.ContainsKey(adjacentPos))
+                        if (!obstaclesToDamage.ContainsKey(adjacentLoc))
                         {
-                            obstaclesToDamage.Add(adjacentPos, (ObstacleBlock)adjacentBlock);
+                            obstaclesToDamage.Add(adjacentLoc, (ObstacleBlock)adjacentBlock);
                         }
                     }
                 }
@@ -489,37 +442,39 @@ public sealed class BoardCreator : MonoBehaviour
             SetBlockLoc(newBlock, targetLoc);
 
             BlockAnimator.AnimateBlockCreation(newBlock);
-            BlockAnimator.AnimateBlockLocationChange(newBlock, new Vector2(column, targetRow), 0.8f);
+            BlockAnimator.AnimateBlockLocationChange(newBlock, new Vector2(column, targetRow), fallDuration);
         }
     }
 
     #endregion
 
-    private void SetBlockLoc(Block block, Vector2Int newLoc, bool doesFall = false)
+    private void SetBlockLoc(Block block, Vector2Int newLoc, bool doesFall = false, bool doesSwap = false) // Does fall variable is just used for blocks that are already in the board and will fall under. Do not set it to true in case of creation of missing blocks
     {
-        if (!IsWithinBounds(newLoc.x, newLoc.y)) { return; }
+        if (!IsWithinBounds(newLoc)) { return; }
 
         BlockData.BLOCKTYPE blockType = block.Data.BlockType;
-        Vector2Int oldLoc = block.LocationOnBoard;
+        Vector2Int oldLoc = block.Location;
 
         switch (blockType)
         {
             case BlockData.BLOCKTYPE.Colored:
                 if (doesFall) { _coloredBlocks.Remove(oldLoc); }
+                else if (doesSwap) { _coloredBlocks.Remove(newLoc); }
                 _coloredBlocks.Add(newLoc, (ColoredBlock)block); break;
             case BlockData.BLOCKTYPE.Obstacle:
                 if(doesFall) { _obstacleBlocks.Remove(oldLoc); }
+                else if(doesSwap) { _obstacleBlocks.Remove(newLoc); }
                 _obstacleBlocks.Add(newLoc, (ObstacleBlock)block); break;
         }
 
         if (doesFall) { _board[oldLoc.x, oldLoc.y] = null; }
-        block.LocationOnBoard = newLoc;
+        block.Location = newLoc;
         _board[newLoc.x, newLoc.y] = block;
     }
 
     private void RemoveBlock(Block block)
     {
-        Vector2Int loc = block.LocationOnBoard;
+        Vector2Int loc = block.Location;
 
         switch (block.Data.BlockType)
         {
@@ -565,8 +520,9 @@ public sealed class BoardCreator : MonoBehaviour
         }
     }
 
-    private bool IsWithinBounds(int rowIndex, int colIndex)
+    private bool IsWithinBounds(Vector2Int location)
     {
+        int rowIndex = location.x, colIndex = location.y;
         return rowIndex >= 0 && rowIndex < _levelBoardData.MaxColumnCount && colIndex >= 0 && colIndex < _levelBoardData.MaxRowCount;
     }
 

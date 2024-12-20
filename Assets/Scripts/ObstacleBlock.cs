@@ -1,6 +1,5 @@
-using DG.Tweening;
-using System.Collections;
 using UnityEngine;
+using MatchMania.Blocks;
 
 public class ObstacleBlock : Block
 {

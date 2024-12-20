@@ -1,7 +1,7 @@
 using DG.Tweening;
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using MatchMania.Blocks;
 
 public class InactivityChecker : MonoBehaviour
 {
@@ -51,7 +51,7 @@ public class InactivityChecker : MonoBehaviour
 
             for(int i = 0; i < blocks.Length; i++)
             {
-                tweens[i] = Highlighter.HighlightBlock(blocks[i]);
+                tweens[i] = Highlighter.HighlightBlock(blocks[i].transform);
             }
 
             yield return new WaitForSeconds(4f); // Keep the highlight for 4 seconds
@@ -66,7 +66,7 @@ public class InactivityChecker : MonoBehaviour
     {
         for (int i = 0; i < blocks.Length; i++)
         {
-            Highlighter.StopHighlight(blocks[i], tweens[i]);
+            Highlighter.StopHighlight(blocks[i].transform, tweens[i]);
         }
     }
 }

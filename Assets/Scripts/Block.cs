@@ -2,48 +2,51 @@ using DG.Tweening;
 using System.Collections;
 using UnityEngine;
 
-[RequireComponent(typeof(BoxCollider2D), typeof(SpriteRenderer))]
-public abstract class Block : MonoBehaviour
+namespace MatchMania.Blocks
 {
-    [SerializeField] protected BlockData _data;
-    public BlockData Data { get => _data; }
-
-    protected int _groupID = -1;
-    public int GroupID { get => _groupID; }
-    protected SpriteRenderer _spriteRenderer;
-    protected BoxCollider2D _boxCollider2D;
-    protected Vector2Int _locationOnBoard;
-    public Vector2Int LocationOnBoard { get => _locationOnBoard; set => _locationOnBoard = value; }
-    private bool _isMoving;
-    public bool IsMoving { get => _isMoving; }
-
-    private void Awake()
+    [RequireComponent(typeof(BoxCollider2D), typeof(SpriteRenderer))]
+    public abstract class Block : MonoBehaviour
     {
-        _spriteRenderer = GetComponent<SpriteRenderer>();
-        _boxCollider2D = GetComponent<BoxCollider2D>();
-    }
+        [SerializeField] protected BlockData _data;
+        public BlockData Data { get => _data; }
 
-    public virtual void SetGroupID(int groupID, int groupSize)
-    {
-        _groupID = groupID;
-    }
+        protected int _groupID = -1;
+        public int GroupID { get => _groupID; }
+        protected SpriteRenderer _spriteRenderer;
+        protected BoxCollider2D _boxCollider2D;
+        protected Vector2Int _location;
+        public Vector2Int Location { get => _location; set => _location = value; }
+        private bool _isMoving;
+        public bool IsMoving { get => _isMoving; }
 
-    protected virtual void PlayBlastSound(float volume = 1f)
-    {
-        AudioManager.Singleton.PlaySound(Data.BlastSound[Random.Range(0, Data.BlastSound.Length)], volume);
-    }
+        private void Awake()
+        {
+            _spriteRenderer = GetComponent<SpriteRenderer>();
+            _boxCollider2D = GetComponent<BoxCollider2D>();
+        }
 
-    public void Moving(float moveDuration)
-    {
-        _isMoving = true;
-        _boxCollider2D.enabled = false;
-        StartCoroutine(ResetMoving(moveDuration));
-    }
+        public virtual void SetGroupID(int groupID, int groupSize)
+        {
+            _groupID = groupID;
+        }
 
-    IEnumerator ResetMoving(float moveDuration)
-    {
-        yield return new WaitForSeconds(moveDuration);
-        _isMoving = false;
-        _boxCollider2D.enabled = true;
+        protected virtual void PlayBlastSound(float volume = 1f)
+        {
+            AudioManager.Singleton.PlaySound(Data.BlastSound[Random.Range(0, Data.BlastSound.Length)], volume);
+        }
+
+        public void Moving(float moveDuration)
+        {
+            _isMoving = true;
+            _boxCollider2D.enabled = false;
+            StartCoroutine(ResetMoving(moveDuration));
+        }
+
+        IEnumerator ResetMoving(float moveDuration)
+        {
+            yield return new WaitForSeconds(moveDuration);
+            _isMoving = false;
+            _boxCollider2D.enabled = true;
+        }
     }
 }

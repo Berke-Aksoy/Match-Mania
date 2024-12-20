@@ -1,5 +1,6 @@
 using DG.Tweening;
 using UnityEngine;
+using MatchMania.Blocks;
 
 public static class BlockAnimator
 {
@@ -15,7 +16,7 @@ public static class BlockAnimator
         block.transform.DOScale(Vector3.one, 0.3f);
     }
 
-    public static void AnimateBlockLocationChange(Block block, Vector2 targetPosition, float duration = 0.6f, Ease ease = Ease.OutBounce)
+    public static void AnimateBlockLocationChange(Block block, Vector2 targetPosition, float duration = 0.5f, Ease ease = Ease.OutBounce)
     {
         block.Moving(duration);
         block.transform.DOMove(targetPosition, duration).SetEase(ease);
