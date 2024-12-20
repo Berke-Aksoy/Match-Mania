@@ -190,6 +190,11 @@ public sealed class BoardCreator : MonoBehaviour
         List<List<ColoredBlock>> groupedBlocks = GroupBlocksByColor(); // At first selected color index points to the most used color
         int uniqueColorCount = groupedBlocks.Count;
 
+        if(uniqueColorCount < 1)
+        {
+            return CreateNewBlockAndReplaceOne(groupedBlocks, uniqueColorCount);
+        }
+
         while (tryCount < uniqueColorCount)
         {
             int selGroupCount = groupedBlocks[tryCount].Count;
@@ -198,8 +203,6 @@ public sealed class BoardCreator : MonoBehaviour
                 tryCount++;
                 continue;
             }
-
-            Debug.Log("uniqueColorCount: " + uniqueColorCount + " " + groupedBlocks[tryCount].Count);
 
             for (int pivotIndex = 0; pivotIndex < selGroupCount; pivotIndex++)
             {
@@ -210,7 +213,7 @@ public sealed class BoardCreator : MonoBehaviour
                 {
                     int index = (pivotIndex + 1) % selGroupCount;
                     Vector2Int moverBlockLoc = groupedBlocks[tryCount][index].Location; // Move the next block in the group to adjacent location of pivot block
-                    SwapBlocks((Vector2Int)availableLoc, moverBlockLoc);
+                    SwapBlocks(availableLoc.Value, moverBlockLoc);
                     return true;
                 }
             }
@@ -218,7 +221,18 @@ public sealed class BoardCreator : MonoBehaviour
             tryCount++;
         }
 
+        return CreateNewBlockAndReplaceOne(groupedBlocks, uniqueColorCount);
+    }
+
+    private bool CreateNewBlockAndReplaceOne(List<List<ColoredBlock>> groupedBlocks, int uniqueColorCount)
+    {
         Debug.LogWarning("Could not find a suitable block to swap for creating a valid group. Try instantiating a new block in the place of an existing one"); // To Do:
+        /*
+        Vector2Int pivotLoc = groupedBlocks[tryCount - 1][0].Location;
+        availableLoc = FindValidAdjacentLoc((Vector2Int)availableLoc.Value);
+        GameObject newObj = Instantiate(groupedBlocks[tryCount][0].gameObject, (Vector3Int)loc, Quaternion.identity, transform);
+        */
+
         return false;
     }
 
