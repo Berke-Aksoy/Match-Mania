@@ -1,4 +1,5 @@
 using DG.Tweening;
+using System.Collections;
 using UnityEngine;
 
 [RequireComponent(typeof(BoxCollider2D), typeof(SpriteRenderer))]
@@ -13,6 +14,8 @@ public abstract class Block : MonoBehaviour
     protected BoxCollider2D _boxCollider2D;
     protected Vector2Int _locationOnBoard;
     public Vector2Int LocationOnBoard { get => _locationOnBoard; set => _locationOnBoard = value; }
+    private bool _isMoving;
+    public bool IsMoving { get => _isMoving; }
 
     private void Awake()
     {
@@ -30,11 +33,6 @@ public abstract class Block : MonoBehaviour
         AudioManager.Singleton.PlaySound(Data.BlastSound[Random.Range(0, Data.BlastSound.Length)], volume);
     }
 
-    public void ColliderOnOff(bool isOn)
-    {
-        _boxCollider2D.enabled = isOn;
-    }
-
     protected void ShakeBlock(float shakeDuration = 0.5f)
     {
         _boxCollider2D.enabled = false;
@@ -42,5 +40,19 @@ public abstract class Block : MonoBehaviour
         {
             _boxCollider2D.enabled = true;
         });
+    }
+
+    public void Moving(float moveDuration)
+    {
+        _isMoving = true;
+        _boxCollider2D.enabled = false;
+        StartCoroutine(ResetMoving(moveDuration));
+    }
+
+    IEnumerator ResetMoving(float moveDuration)
+    {
+        yield return new WaitForSeconds(moveDuration);
+        _isMoving = false;
+        _boxCollider2D.enabled = true;
     }
 }

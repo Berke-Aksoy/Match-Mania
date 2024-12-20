@@ -1,6 +1,8 @@
 using DG.Tweening;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
+using Unity.VisualScripting;
 using UnityEngine;
 
 public sealed class BoardCreator : MonoBehaviour
@@ -74,6 +76,7 @@ public sealed class BoardCreator : MonoBehaviour
 
         int totalRows = _levelBoardData.MaxRowCount;
         int totalCols = _levelBoardData.MaxColumnCount;
+        bool hasMovingPiece = false;
 
         bool[,] visited = new bool[totalCols, totalRows];
         BlockData.COLORTYPE targetColorType;
@@ -92,6 +95,7 @@ public sealed class BoardCreator : MonoBehaviour
             {
                 Block currentBlock = queue.Dequeue();
                 candidateBlockList.Add(currentBlock);
+                if (!hasMovingPiece) { hasMovingPiece = currentBlock.IsMoving; }
 
                 foreach (Vector2Int direction in NeighborDirections)
                 {
@@ -109,7 +113,7 @@ public sealed class BoardCreator : MonoBehaviour
 
             if (blockCount >= minBlastableBlockCount)
             {
-                BlockGroup newGroup = new BlockGroup(candidateBlockList);
+                BlockGroup newGroup = new BlockGroup(candidateBlockList, hasMovingPiece);
                 blockGroups.Add(newGroup);
             }
             else
@@ -127,11 +131,11 @@ public sealed class BoardCreator : MonoBehaviour
 
         if (blockGroups.Count == 0) // && PowerBlockCount = 0 // Check whether there are no groups and enough colored blocks to blast
         {
-            if (_coloredBlocks.Count > minBlastableBlockCount)
+            if (_coloredBlocks.Count > minBlastableBlockCount) // There are enough blocks to create a blastable group regardless of their color type
             {
-                Debug.Log("Shuffle is available and needed");
-                IntentionalShuffle();
-                FindColoredBlockGroups();
+                Debug.Log("Shuffle is available and needed.");
+                //IntentionalShuffle();
+                //FindColoredBlockGroups();
             }
             else // Imagine an edge case that the top row is full of obstacles and below rows are emptied out
             {
@@ -180,8 +184,8 @@ public sealed class BoardCreator : MonoBehaviour
             foreach (ColoredBlock candidateBlock in candidateBlocks)  // Try to find a block to swap with, they are already in same color therefore, no need to check color
             {
                 if (candidateBlock.LocationOnBoard == pivotBlock.LocationOnBoard) continue;
-
-                if (TryMakeAdjacent(pivotBlock.LocationOnBoard, candidateBlock.LocationOnBoard)) // Attempt to swap the blocks to make them adjacent
+                
+                if (TryMakeAdjacent(pivotBlock.LocationOnBoard, candidateBlock.LocationOnBoard))
                 {
                     return true;
                 }
@@ -190,6 +194,7 @@ public sealed class BoardCreator : MonoBehaviour
                     randomIndex = (randomIndex + 1) % candBlockCount;
                     pivotBlock = candidateBlocks[randomIndex];
                 }
+                
             }
 
             tryCount++;
@@ -202,22 +207,24 @@ public sealed class BoardCreator : MonoBehaviour
 
     private BlockData.COLORTYPE[] GetUniqueColorCount()
     {
-        HashSet<BlockData.COLORTYPE> uniqueColors = new HashSet<BlockData.COLORTYPE>();
+        List<BlockData.COLORTYPE> uniqueColors = new List<BlockData.COLORTYPE>();
 
         foreach (Block block in _coloredBlocks.Values)
         {
-            if (uniqueColors.Count == _levelBoardData.UsedColoredBlocks.Length) { break; }
-            uniqueColors.Add(block.Data.ColorType); // Replace ColorType with the relevant property
+            BlockData.COLORTYPE colorType = block.Data.ColorType;
+
+            if (!uniqueColors.Contains(colorType)) // Add the color to the list if it's not already present
+            {
+                uniqueColors.Add(colorType);
+            }
+
+            if (uniqueColors.Count == _levelBoardData.UsedColoredBlocks.Length) // Early exit if we've found all possible colors
+            {
+                break;
+            }
         }
 
-        BlockData.COLORTYPE[] colorsToCompare = new BlockData.COLORTYPE[uniqueColors.Count];
-
-        for (int j = 0; j < _levelBoardData.UsedColoredBlocks.Length; j++) // Find and store which colors to compare in the current shuffle situation because in a situation there may be less colors than used in level.
-        {
-            uniqueColors.TryGetValue(_levelBoardData.UsedColoredBlocks[j].Data.ColorType, out colorsToCompare[0]);
-        }
-        
-        return colorsToCompare;
+        return uniqueColors.ToArray();
     }
     
     private List<ColoredBlock>[] CountBlocksOfColors(ref int selectedColorIndex)
@@ -248,23 +255,35 @@ public sealed class BoardCreator : MonoBehaviour
             }
         }
 
-        foreach(List<ColoredBlock> blockList in coloredBlocksByType)
+        int maxCount = 0;
+        for(int i = 0; i < coloredBlocksByType.Length; i++)
         {
-            int count = blockList.Count;
-            if(count > selectedColorIndex) selectedColorIndex = count;
+            int curCount = coloredBlocksByType[i].Count;
+            Debug.Log(i + "th list Colored block count: " + curCount);
+            if (curCount > maxCount)
+            {
+                maxCount = curCount;
+                selectedColorIndex = i;
+            }
         }
 
         return coloredBlocksByType;
     }
 
-    private bool TryMakeAdjacent(Vector2Int pivotPos, Vector2Int candidatePos, bool reversed = false) // Returns true is blocks are made adjacent
+    private bool TryMakeAdjacent(Vector2Int pivotPos, Vector2Int candidatePos) // Returns true is blocks are made adjacent
     {
         foreach (Vector2Int dir in NeighborDirections) // Try each block that is adjacent to pivot block
         {
             Vector2Int adjacentPos = pivotPos + dir;
 
-            if (IsWithinBounds(adjacentPos.x, adjacentPos.y) && _board[adjacentPos.x, adjacentPos.y] != null && _board[adjacentPos.x, adjacentPos.y].Data.BlockType != BlockData.BLOCKTYPE.Obstacle) // Obstacle blocks are not swappable
+            if (IsWithinBounds(adjacentPos.x, adjacentPos.y) && _board[adjacentPos.x, adjacentPos.y].Data.BlockType != BlockData.BLOCKTYPE.Obstacle) // Obstacle blocks are not swappable
             {
+                if(_board[adjacentPos.x, adjacentPos.y] == null) // Try not to place the block in mid air
+                {
+                    adjacentPos += NeighborDirections[1]; // Look under it
+                    if (IsWithinBounds(adjacentPos.x, adjacentPos.y) && _board[adjacentPos.x, adjacentPos.y] == null) { continue; }
+                }
+
                 SwapBlocks(adjacentPos, candidatePos);
                 return true;
             }
@@ -287,26 +306,27 @@ public sealed class BoardCreator : MonoBehaviour
         _coloredBlocks.Add(pos1, (ColoredBlock)candidate);
         _coloredBlocks.Add(pos2, (ColoredBlock)adjacent);
 
-        AnimateBlockLocationChange(adjacent, pos2);
-        AnimateBlockLocationChange(candidate, pos1);
+        AnimateBlockLocationChange(adjacent, pos2, 2f);
+        AnimateBlockLocationChange(candidate, pos1, 2f);
     }
 
     #endregion
 
     #region Blast Mechanic
 
-    public void BlastGroup(int groupID)
+    public bool BlastGroup(int groupID)
     {
-        Debug.Log("Blasting group " + groupID);
         BlockGroup blastGroup = _blockGroups[groupID]; // The list is sequencial because we reset the ID counter in FindGroups method.
+        if (blastGroup.HasMovingPiece) // If the group known as having a moving piece, check current condition of the group
+        {
+            if (!IsBlastable(blastGroup)) { return false; }
+        }
 
         DamageAdjacentObstacles(FindAdjacentObstacles(blastGroup));
 
         foreach (Block block in blastGroup.Blocks)
         {
-            Vector2Int loc = block.LocationOnBoard;
-            _coloredBlocks.Remove(loc);
-            _board[loc.x, loc.y] = null;
+            RemoveBlock(block);
             Destroy(block.gameObject);
         }
 
@@ -314,7 +334,20 @@ public sealed class BoardCreator : MonoBehaviour
         ApplyGravity();
         FindColoredBlockGroups();
         AssignGroupIDs();
+
+        return true;
     }
+
+    private bool IsBlastable(BlockGroup blastGroup) // Updates the status of the group variable HasMovingPiece
+    {
+        foreach (Block block in blastGroup.Blocks)
+        {
+            if(block.IsMoving) { return false; }
+        }
+
+        return true;
+    }
+
 
     private Dictionary<Vector2Int, ObstacleBlock> FindAdjacentObstacles(BlockGroup blockGroup)
     {
@@ -350,11 +383,7 @@ public sealed class BoardCreator : MonoBehaviour
 
         while (pointer.MoveNext()) {
             bool? isDestroyed = pointer.Current.Value?.TakeDamage();
-            if (isDestroyed == true) {
-                Vector2Int blockLoc = pointer.Current.Key;
-                _obstacleBlocks.Remove(blockLoc);
-                _board[blockLoc.x, blockLoc.y] = null;
-            }
+            if (isDestroyed == true) { RemoveBlock(pointer.Current.Value); }
         }
     }
 
@@ -471,19 +500,33 @@ public sealed class BoardCreator : MonoBehaviour
         _board[newLoc.x, newLoc.y] = block;
     }
 
+    private void RemoveBlock(Block block)
+    {
+        Vector2Int loc = block.LocationOnBoard;
+
+        switch (block.Data.BlockType)
+        {
+            case BlockData.BLOCKTYPE.Colored:
+                _coloredBlocks.Remove(loc);
+                break;
+            case BlockData.BLOCKTYPE.Obstacle:
+                _obstacleBlocks.Remove(loc);
+                break;
+        }
+
+        _board[loc.x, loc.y] = null;
+    }
+
     private void AnimateBlockCreation(Block block)
     {
         block.transform.localScale = Vector3.zero;
         block.transform.DOScale(Vector3.one, 0.3f);
     }
 
-    private void AnimateBlockLocationChange(Block block, Vector2 targetPosition, float duration = 0.4f, Ease ease = Ease.OutBounce)
+    private void AnimateBlockLocationChange(Block block, Vector2 targetPosition, float duration = 2f, Ease ease = Ease.OutBounce)
     {
-        block.ColliderOnOff(false);
-        block.transform.DOMove(targetPosition, duration).SetEase(ease).OnComplete(() =>
-        {
-            block.ColliderOnOff(true);
-        });
+        block.Moving(duration);
+        block.transform.DOMove(targetPosition, duration).SetEase(ease);
     }
 
     #region Helpers
@@ -493,14 +536,17 @@ public sealed class BoardCreator : MonoBehaviour
         private static int _idCounter;
         private int _groupID;
         public int GroupID { get { return _groupID; } }
+        private bool _hasMovingPiece;
+        public bool HasMovingPiece { get { return _hasMovingPiece; } }
 
         private List<Block> _blocks;
         public List<Block> Blocks { get { return _blocks; } }
 
-        public BlockGroup(List<Block> blocks)
+        public BlockGroup(List<Block> blocks, bool hasMovingPiece)
         {
             _groupID = _idCounter;
             _idCounter++;
+            _hasMovingPiece = hasMovingPiece;
             _blocks = new List<Block>();
             _blocks.AddRange(blocks);
         }

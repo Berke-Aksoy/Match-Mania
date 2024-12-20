@@ -11,9 +11,11 @@ public class ColoredBlock : Block, IInteractable
         if(_groupID == -1) { ShakeBlock(); return; }
 
         BoardCreator boardCreator = GetComponentInParent<BoardCreator>();
-        boardCreator.BlastGroup(_groupID);
-
-        PlayBlastSound();
+        if (boardCreator.BlastGroup(_groupID))
+        {
+            PlayBlastSound();
+        }
+        
     }
 
     public override void SetGroupID(int groupID, int groupSize)
@@ -44,7 +46,6 @@ public class ColoredBlock : Block, IInteractable
 
     private void OnMouseDown()
     {
-        Debug.Log(name + " clicked on " + _groupID);
         OnInteract();
     }
 }
