@@ -51,7 +51,7 @@ public sealed class BoardCreator : MonoBehaviour
                 Block newBlock;
                 Vector2Int loc = new Vector2Int(i, j);
 
-                if (Random.Range(0, 100) < 90) // Create colored blocks
+                if (Random.Range(0, 100) < _levelBoardData.coloredBlockChance) // Create colored blocks
                 {
                     newObj = Instantiate(_levelBoardData.UsedColoredBlocks[Random.Range(0, _levelBoardData.UsedColoredBlocks.Length)].gameObject, new Vector3(i, j, 0), Quaternion.identity, transform);
                     
@@ -146,10 +146,13 @@ public sealed class BoardCreator : MonoBehaviour
         
         if (blockGroups.Count == 0) // && PowerBlockCount = 0 // Check whether there are no groups and enough colored blocks to blast
         {
+            Debug.Log("Edge cases");
+            StartCoroutine(WaitFallingBlocks());
+
             if (_coloredBlocks.Count > minBlastableBlockCount) // There are enough blocks to create a blastable group regardless of their color type
             {
                 Debug.Log("Shuffle is available and needed."); // All shuffles are made between coloredBlocks
-                StartCoroutine(WaitFallingBlocks());
+                
             }
             else // Imagine an edge case that the top row is full of obstacles and below rows are emptied out
             {
