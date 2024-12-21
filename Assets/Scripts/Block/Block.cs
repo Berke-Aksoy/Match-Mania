@@ -1,6 +1,5 @@
 using System.Collections;
 using UnityEngine;
-using MatchMania.Managers.Audio;
 
 namespace MatchMania.Blocks
 {
@@ -32,7 +31,7 @@ namespace MatchMania.Blocks
 
         protected virtual void PlayBlastSound(float volume = 1f)
         {
-            AudioManager.Singleton.PlaySound(Data.BlastSound[Random.Range(0, Data.BlastSound.Length)], volume);
+            AudioManager.Instance.PlaySound(Data.BlastSound[Random.Range(0, Data.BlastSound.Length)], volume);
         }
 
         public void Moving(float moveDuration)

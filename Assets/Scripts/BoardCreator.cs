@@ -8,7 +8,7 @@ public sealed class BoardCreator : MonoBehaviour
     private static BoardCreator _instance;
     public static BoardCreator Singleton { get => _instance; }
 
-    [SerializeField] private LevelBoardData _levelBoardData; // To Do: Get this level from levelManager or somewhere else
+    private LevelBoardData _levelBoardData;
     [Header("Threshold")]
     [SerializeField] private int minBlastableBlockCount = 2;
 
@@ -33,6 +33,7 @@ public sealed class BoardCreator : MonoBehaviour
 
     private void Start()
     {
+        _levelBoardData = LevelManager.Instance.GetLevelData();
         CreateBoard(_levelBoardData.MaxRowCount, _levelBoardData.MaxColumnCount);
         FindColoredBlockGroups();
         AssignGroupIDs();
