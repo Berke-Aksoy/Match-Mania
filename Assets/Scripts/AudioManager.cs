@@ -1,27 +1,30 @@
 using UnityEngine;
 
-public sealed class AudioManager : MonoBehaviour
+namespace MatchMania.Managers.Audio
 {
-    private static AudioManager _instance;
-    public static AudioManager Singleton { get => _instance; }
-    private AudioSource _audioSource;
-
-    private void Awake()
+    public sealed class AudioManager : MonoBehaviour
     {
-        if (_instance == null)
+        private static AudioManager _instance;
+        public static AudioManager Singleton { get => _instance; }
+        private AudioSource _audioSource;
+
+        private void Awake()
         {
-            _instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
+            if (_instance == null)
+            {
+                _instance = this;
+            }
+            else
+            {
+                Destroy(gameObject);
+            }
+
+            _audioSource = GetComponent<AudioSource>();
         }
 
-        _audioSource = GetComponent<AudioSource>();
-    }
-
-    public void PlaySound(AudioClip clip, float volume = 1f)
-    {
-        _audioSource.PlayOneShot(clip, volume);
+        public void PlaySound(AudioClip clip, float volume = 1f)
+        {
+            _audioSource.PlayOneShot(clip, volume);
+        }
     }
 }

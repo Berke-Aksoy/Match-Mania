@@ -1,4 +1,5 @@
 using UnityEngine;
+using MatchMania.Blocks;
 
 [CreateAssetMenu(fileName = "levelData", menuName = "Level Board Data")]
 public sealed class LevelBoardData : ScriptableObject

@@ -222,7 +222,7 @@ public sealed class BoardCreator : MonoBehaviour
             if (validLoc.HasValue) // Step 2: Create a new block that is same with the current kvp.Value and replace the block on the validLoc
             {
                 Block temp = _coloredBlocks.GetValueOrDefault(validLoc.Value);
-                RemoveBlock(temp);
+                RemoveBlock(temp.Location, BLOCKTYPE.Colored);
                 Destroy(temp.gameObject);
 
                 GameObject newObj = Instantiate(kvp.Value.gameObject, new Vector3(validLoc.Value.x, validLoc.Value.y, 0), Quaternion.identity, transform);
@@ -230,7 +230,6 @@ public sealed class BoardCreator : MonoBehaviour
                 SetBlockLoc(newBlock, validLoc.Value);
                 BlockAnimator.ShakeBlock(newBlock);
 
-                Debug.Log($"Replaced block at {validLoc} with new block");
                 return true;
             }
         }
@@ -242,7 +241,17 @@ public sealed class BoardCreator : MonoBehaviour
 
     private void WipeOutObstacles()
     {
-        Debug.LogWarning("No valid block replacement found. Clearing obstacles...");
+        int obstacleCount = _obstacleBlocks.Count;
+        List<ObstacleBlock> obstacles = new List<ObstacleBlock>();
+        obstacles.AddRange(_obstacleBlocks.Values);
+
+        for(int i = 0; i < obstacleCount; i++)
+        {
+            RemoveBlock(obstacles[i].Location, BLOCKTYPE.Obstacle);  
+            obstacles[i].TakeDamage(true);
+        }
+
+        ApplyGravity();
     }
 
     private List<List<ColoredBlock>> GroupBlocksByColor()
@@ -320,19 +329,22 @@ public sealed class BoardCreator : MonoBehaviour
         }
 
         DamageAdjacentObstacles(FindAdjacentObstacles(blastGroup));
-
         foreach (Block block in blastGroup.Blocks)
         {
-            RemoveBlock(block);
-            Destroy(block.gameObject);
+            DestroyBlock(block);
         }
-
         // Get the blast initiator block's location and create the powerup (if powerup will ever be implemented)
         ApplyGravity();
         FindColoredBlockGroups();
         AssignGroupIDs();
 
         return true;
+    }
+
+    private void DestroyBlock(Block blockToDestroy)
+    {
+        RemoveBlock(blockToDestroy.Location, blockToDestroy.Data.BlockType);
+        Destroy(blockToDestroy.gameObject);
     }
 
     private bool IsBlastable(BlockGroup blastGroup) // Updates the status of the group variable HasMovingPiece
@@ -379,7 +391,7 @@ public sealed class BoardCreator : MonoBehaviour
 
         while (pointer.MoveNext()) {
             bool? isDestroyed = pointer.Current.Value?.TakeDamage();
-            if (isDestroyed == true) { RemoveBlock(pointer.Current.Value); }
+            if (isDestroyed == true) { RemoveBlock(pointer.Current.Key, BLOCKTYPE.Obstacle); }
         }
     }
 
@@ -498,11 +510,9 @@ public sealed class BoardCreator : MonoBehaviour
         _board[newLoc.x, newLoc.y] = block;
     }
 
-    private void RemoveBlock(Block block)
+    private void RemoveBlock(Vector2Int loc, BLOCKTYPE blockType)
     {
-        Vector2Int loc = block.Location;
-
-        switch (block.Data.BlockType)
+        switch (blockType)
         {
             case BLOCKTYPE.Colored:
                 _coloredBlocks.Remove(loc);
