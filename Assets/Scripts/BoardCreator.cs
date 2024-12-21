@@ -94,7 +94,7 @@ public sealed class BoardCreator : MonoBehaviour
         bool hasMovingPiece = false;
 
         bool[,] visited = new bool[totalCols, totalRows];
-        BlockData.COLORTYPE targetColorType;
+        COLORTYPE targetColorType;
 
         Dictionary<Vector2Int, ColoredBlock>.Enumerator pointer = _coloredBlocks.GetEnumerator();
 
@@ -280,6 +280,8 @@ public sealed class BoardCreator : MonoBehaviour
 
     private Vector2Int? FindValidAdjacentLoc(Vector2Int locToCheck)
     {
+        List<Vector2Int> validLocs = new List<Vector2Int>();
+
         foreach (Vector2Int dir in NeighborDirections)
         {
             Vector2Int adjacentLoc = locToCheck + dir;
@@ -292,16 +294,16 @@ public sealed class BoardCreator : MonoBehaviour
                     Vector2Int underAdjacentLoc = adjacentLoc + NeighborDirections[1]; // Look under adjacent location
                     if (IsWithinBounds(underAdjacentLoc) && _board[underAdjacentLoc.x, underAdjacentLoc.y] == null) { continue; } // If adjacent location is in mid air, it is not a valid location
                 }
-                else if(block.Data.BlockType == BlockData.BLOCKTYPE.Obstacle)
+                else if(block.Data.BlockType == BLOCKTYPE.Obstacle)
                 {
                     continue;
                 }
 
-                return adjacentLoc;
+                validLocs.Add(adjacentLoc);
             }
         }
 
-        return null;
+        return validLocs[Random.Range(0, validLocs.Count)];
     }
 
     private void SwapBlocks(Vector2Int pos1, Vector2Int pos2)
@@ -368,7 +370,7 @@ public sealed class BoardCreator : MonoBehaviour
                 {
                     Block adjacentBlock = _board[adjacentLoc.x, adjacentLoc.y];
 
-                    if (adjacentBlock.Data.BlockType == BlockData.BLOCKTYPE.Obstacle)
+                    if (adjacentBlock.Data.BlockType == BLOCKTYPE.Obstacle)
                     {
                         if (!obstaclesToDamage.ContainsKey(adjacentLoc))
                         {
@@ -407,7 +409,7 @@ public sealed class BoardCreator : MonoBehaviour
             {
                 Block currentBlock = _board[x, y];
 
-                if (currentBlock != null && currentBlock.Data.BlockType != BlockData.BLOCKTYPE.Obstacle) // To Do: _canMove bool variable must be added to Block script
+                if (currentBlock != null && currentBlock.Data.BlockType != BLOCKTYPE.Obstacle) // To Do: _canMove bool variable must be added to Block script
                 {
                     int lowestAvailableRow = FindLowestAvailableRow(x, y); // Find the lowest available position in this column
 
@@ -437,7 +439,7 @@ public sealed class BoardCreator : MonoBehaviour
             {
                 lowestAvailableRow = row; // Update the lowest available row to this empty cell
             }
-            else if (_board[col, row].Data.BlockType == BlockData.BLOCKTYPE.Obstacle)
+            else if (_board[col, row].Data.BlockType == BLOCKTYPE.Obstacle)
             {
                 break; // Stop the search if an obstacle is encountered
             }
@@ -459,7 +461,7 @@ public sealed class BoardCreator : MonoBehaviour
             {
                 missingBlockCount++;
             }
-            else if (_board[column, y].Data.BlockType == BlockData.BLOCKTYPE.Obstacle)
+            else if (_board[column, y].Data.BlockType == BLOCKTYPE.Obstacle)
             {
                 break; // Stop counting if an obstacle is encountered
             }
@@ -487,16 +489,16 @@ public sealed class BoardCreator : MonoBehaviour
     {
         if (!IsWithinBounds(newLoc)) { return; }
 
-        BlockData.BLOCKTYPE blockType = block.Data.BlockType;
+        BLOCKTYPE blockType = block.Data.BlockType;
         Vector2Int oldLoc = block.Location;
 
         switch (blockType)
         {
-            case BlockData.BLOCKTYPE.Colored:
+            case BLOCKTYPE.Colored:
                 if (removeOld) { _coloredBlocks.Remove(oldLoc); }
                 else if (doesSwap) { _coloredBlocks.Remove(newLoc); }
                 _coloredBlocks.Add(newLoc, (ColoredBlock)block); break;
-            case BlockData.BLOCKTYPE.Obstacle:
+            case BLOCKTYPE.Obstacle:
                 if(removeOld) { _obstacleBlocks.Remove(oldLoc); }
                 else if(doesSwap) { _obstacleBlocks.Remove(newLoc); }
                 _obstacleBlocks.Add(newLoc, (ObstacleBlock)block); break;
@@ -513,10 +515,10 @@ public sealed class BoardCreator : MonoBehaviour
 
         switch (block.Data.BlockType)
         {
-            case BlockData.BLOCKTYPE.Colored:
+            case BLOCKTYPE.Colored:
                 _coloredBlocks.Remove(loc);
                 break;
-            case BlockData.BLOCKTYPE.Obstacle:
+            case BLOCKTYPE.Obstacle:
                 _obstacleBlocks.Remove(loc);
                 break;
         }
