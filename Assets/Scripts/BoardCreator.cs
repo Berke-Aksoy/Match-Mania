@@ -9,7 +9,7 @@ public sealed class BoardCreator : MonoBehaviour
     public static BoardCreator Singleton { get => _instance; }
 
     [SerializeField] private LevelBoardData _levelBoardData; // To Do: Get this level from levelManager or somewhere else
-    [Header("Thresholds")]
+    [Header("Threshold")]
     [SerializeField] private int minBlastableBlockCount = 2;
 
     private Block[,] _board;
@@ -146,21 +146,7 @@ public sealed class BoardCreator : MonoBehaviour
         
         if (blockGroups.Count == 0) // && PowerBlockCount = 0 // Check whether there are no groups and enough colored blocks to blast
         {
-            Debug.Log("Edge cases");
-            StartCoroutine(WaitFallingBlocks());
-
-            if (_coloredBlocks.Count > minBlastableBlockCount) // There are enough blocks to create a blastable group regardless of their color type
-            {
-                Debug.Log("Shuffle is available and needed."); // All shuffles are made between coloredBlocks
-                
-            }
-            else // Imagine an edge case that the top row is full of obstacles and below rows are emptied out
-            {
-                // adjacent obstacles may be crushed until a group forms
-                // All obstacles may be destroyed
-                // If a row completely full of obstacles in a way that it will block the creation of missing blocks we may create new blocks under them (for that check every possible adjacent block including diagonal neighbors) it must be checked at every move not only here
-                // Let the user pass the level with a secret prize
-            }
+            StartCoroutine(WaitFallingBlocks()); // Handle edge ases
         }
     }
 
@@ -196,7 +182,7 @@ public sealed class BoardCreator : MonoBehaviour
         if(uniqueColorCount < 1)
         {   
             if(uniqueColorCount == 0) { WipeOutObstacles(); return false; } // In this case the map is full of obstacles that's why we need to wipe them out
-            return CreateNewBlockAndReplaceOne(groupedBlocks, uniqueColorCount);
+            return CreateNewBlockAndReplaceOne(groupedBlocks, uniqueColorCount); // If there is one type of color and we couldn't make them group that means they are surrounded by obstacles
         }
 
         while (tryCount < uniqueColorCount)
@@ -233,7 +219,6 @@ public sealed class BoardCreator : MonoBehaviour
         foreach (KeyValuePair<Vector2Int, ColoredBlock> kvp in _coloredBlocks)
         {
             Vector2Int? validLoc = FindValidAdjacentLoc(kvp.Key); // Step 1: Find a valid adjacent location to place the new block around the blockToMakeGroup
-            Debug.Log("Chosen kvp color: " + kvp.Value.Data.ColorType);
             if (validLoc.HasValue) // Step 2: Create a new block that is same with the current kvp.Value and replace the block on the validLoc
             {
                 Block temp = _coloredBlocks.GetValueOrDefault(validLoc.Value);
@@ -306,6 +291,7 @@ public sealed class BoardCreator : MonoBehaviour
             }
         }
 
+        if (validLocs.Count == 0) { return null; }
         return validLocs[Random.Range(0, validLocs.Count)];
     }
 

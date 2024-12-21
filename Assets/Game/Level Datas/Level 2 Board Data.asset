@@ -10,20 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6ad9ebfd66e794349957280cf55a57cd, type: 3}
-  m_Name: Level 1 Board Data
+  m_Name: Level 2 Board Data
   m_EditorClassIdentifier: 
   MaxRowCount: 2
   MaxColumnCount: 3
-  obstacleBlockChance: 50
-  coloredBlockChance: 50
+  obstacleBlockChance: 74
+  coloredBlockChance: 26
   powerBlockChance: 0
   UsedColoredBlocks:
   - {fileID: 4755630860766356898, guid: feef49a1ac70d09488ba53f6ca5f696d, type: 3}
-  - {fileID: 7174038856531577066, guid: dd5e9406ee01e47409320bffe66b946b, type: 3}
-  - {fileID: 564309091731819239, guid: b185ada75ebb6694a8f674809f158a4b, type: 3}
-  - {fileID: 5188471639800735789, guid: e0b921ad1fbdad348a8f31f398d02137, type: 3}
-  - {fileID: 6085410143995811255, guid: 30e811d5d19850b4989529b138d9a62e, type: 3}
-  - {fileID: 7683186006196663964, guid: 8d0d83c4e16346b4f96441d3e1b9d352, type: 3}
   UsedObstacleBlocks:
   - {fileID: 3198527527553245112, guid: ea995585e79df1c4a89c973396a4d4da, type: 3}
   - {fileID: -8877740120500793997, guid: 23ce3bbb740182d47a11401d87220da9, type: 3}
