@@ -148,7 +148,7 @@ public sealed class BoardCreator : MonoBehaviour
         {
             if (_coloredBlocks.Count > minBlastableBlockCount) // There are enough blocks to create a blastable group regardless of their color type
             {
-                Debug.Log("Shuffle is available and needed.");
+                Debug.Log("Shuffle is available and needed."); // All shuffles are made between coloredBlocks
                 StartCoroutine(WaitFallingBlocks());
             }
             else // Imagine an edge case that the top row is full of obstacles and below rows are emptied out
@@ -163,7 +163,7 @@ public sealed class BoardCreator : MonoBehaviour
 
     private System.Collections.IEnumerator WaitFallingBlocks()
     {
-        yield return new WaitForSeconds(fallDuration + 0.1f);
+        yield return new WaitForSeconds(fallDuration + 0.1f); // To Do: test this extra time more
         IntentionalShuffle();
         FindColoredBlockGroups();
         AssignGroupIDs();
@@ -187,11 +187,12 @@ public sealed class BoardCreator : MonoBehaviour
     private bool IntentionalShuffle() // Returns true if the shuffle is succesful.
     {
         int tryCount = 0;
-        List<List<ColoredBlock>> groupedBlocks = GroupBlocksByColor(); // At first selected color index points to the most used color
+        List<List<ColoredBlock>> groupedBlocks = GroupBlocksByColor();
         int uniqueColorCount = groupedBlocks.Count;
 
         if(uniqueColorCount < 1)
-        {
+        {   
+            if(uniqueColorCount == 0) { WipeOutObstacles(); return false; } // In this case the map is full of obstacles that's why we need to wipe them out
             return CreateNewBlockAndReplaceOne(groupedBlocks, uniqueColorCount);
         }
 
@@ -226,14 +227,34 @@ public sealed class BoardCreator : MonoBehaviour
 
     private bool CreateNewBlockAndReplaceOne(List<List<ColoredBlock>> groupedBlocks, int uniqueColorCount)
     {
-        Debug.LogWarning("Could not find a suitable block to swap for creating a valid group. Try instantiating a new block in the place of an existing one"); // To Do:
-        /*
-        Vector2Int pivotLoc = groupedBlocks[tryCount - 1][0].Location;
-        availableLoc = FindValidAdjacentLoc((Vector2Int)availableLoc.Value);
-        GameObject newObj = Instantiate(groupedBlocks[tryCount][0].gameObject, (Vector3Int)loc, Quaternion.identity, transform);
-        */
+        foreach (KeyValuePair<Vector2Int, ColoredBlock> kvp in _coloredBlocks)
+        {
+            Vector2Int? validLoc = FindValidAdjacentLoc(kvp.Key); // Step 1: Find a valid adjacent location to place the new block around the blockToMakeGroup
+            Debug.Log("Chosen kvp color: " + kvp.Value.Data.ColorType);
+            if (validLoc.HasValue) // Step 2: Create a new block that is same with the current kvp.Value and replace the block on the validLoc
+            {
+                Block temp = _coloredBlocks.GetValueOrDefault(validLoc.Value);
+                RemoveBlock(temp);
+                Destroy(temp.gameObject);
 
+                GameObject newObj = Instantiate(kvp.Value.gameObject, new Vector3(validLoc.Value.x, validLoc.Value.y, 0), Quaternion.identity, transform);
+                Block newBlock = newObj.GetComponent<Block>();
+                SetBlockLoc(newBlock, validLoc.Value);
+                BlockAnimator.ShakeBlock(newBlock);
+
+                Debug.Log($"Replaced block at {validLoc} with new block");
+                return true;
+            }
+        }
+
+        // Step 3: If previous steps fail, handle edge cases (e.g., deadlock due to obstacles)
+        WipeOutObstacles();
         return false;
+    }
+
+    private void WipeOutObstacles()
+    {
+        Debug.LogWarning("No valid block replacement found. Clearing obstacles...");
     }
 
     private List<List<ColoredBlock>> GroupBlocksByColor()
@@ -462,7 +483,7 @@ public sealed class BoardCreator : MonoBehaviour
 
     #endregion
 
-    private void SetBlockLoc(Block block, Vector2Int newLoc, bool doesFall = false, bool doesSwap = false) // Does fall variable is just used for blocks that are already in the board and will fall under. Do not set it to true in case of creation of missing blocks
+    private void SetBlockLoc(Block block, Vector2Int newLoc, bool removeOld = false, bool doesSwap = false) // Does fall variable is just used for blocks that are already in the board and will fall under. Do not set it to true in case of creation of missing blocks
     {
         if (!IsWithinBounds(newLoc)) { return; }
 
@@ -472,16 +493,16 @@ public sealed class BoardCreator : MonoBehaviour
         switch (blockType)
         {
             case BlockData.BLOCKTYPE.Colored:
-                if (doesFall) { _coloredBlocks.Remove(oldLoc); }
+                if (removeOld) { _coloredBlocks.Remove(oldLoc); }
                 else if (doesSwap) { _coloredBlocks.Remove(newLoc); }
                 _coloredBlocks.Add(newLoc, (ColoredBlock)block); break;
             case BlockData.BLOCKTYPE.Obstacle:
-                if(doesFall) { _obstacleBlocks.Remove(oldLoc); }
+                if(removeOld) { _obstacleBlocks.Remove(oldLoc); }
                 else if(doesSwap) { _obstacleBlocks.Remove(newLoc); }
                 _obstacleBlocks.Add(newLoc, (ObstacleBlock)block); break;
         }
 
-        if (doesFall) { _board[oldLoc.x, oldLoc.y] = null; }
+        if (removeOld) { _board[oldLoc.x, oldLoc.y] = null; }
         block.Location = newLoc;
         _board[newLoc.x, newLoc.y] = block;
     }
