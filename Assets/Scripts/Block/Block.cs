@@ -1,3 +1,4 @@
+using DG.Tweening;
 using System.Collections;
 using UnityEngine;
 
@@ -17,6 +18,8 @@ namespace MatchMania.Blocks
         public Vector2Int Location { get => _location; set => _location = value; }
         private bool _isMoving;
         public bool IsMoving { get => _isMoving; }
+        private Tween _tween;
+        public Tween Tween { get=>_tween; set => _tween = value; }
 
         private void Awake()
         {

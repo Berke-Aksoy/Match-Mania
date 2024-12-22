@@ -3,7 +3,7 @@ using UnityEngine;
 using MatchMania.Blocks;
 using static BlockData;
 
-public sealed class BoardCreator : MonoBehaviour
+public sealed class BoardCreator : BaseSingleton<BoardCreator>
 {
     private static BoardCreator _instance;
     public static BoardCreator Singleton { get => _instance; }
@@ -18,18 +18,6 @@ public sealed class BoardCreator : MonoBehaviour
 
     private Dictionary<Vector2Int, ColoredBlock> _coloredBlocks = new Dictionary<Vector2Int, ColoredBlock>();
     private Dictionary<Vector2Int, ObstacleBlock> _obstacleBlocks = new Dictionary<Vector2Int, ObstacleBlock>();
-    private float fallDuration = 1f;
-    private void Awake()
-    {
-        if (_instance == null)
-        {
-            _instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
-        }
-    }
 
     private void Start()
     {
@@ -48,26 +36,40 @@ public sealed class BoardCreator : MonoBehaviour
         {
             for(int j = 0; j < rowCount; j++)
             {
-                GameObject newObj;
-                Block newBlock;
-                Vector2Int loc = new Vector2Int(i, j);
-
-                if (Random.Range(0, 100) < _levelBoardData.coloredBlockChance) // Create colored blocks
-                {
-                    newObj = Instantiate(_levelBoardData.UsedColoredBlocks[Random.Range(0, _levelBoardData.UsedColoredBlocks.Length)].gameObject, new Vector3(i, j, 0), Quaternion.identity, transform);
-                    
-                }
-                else // Create obstacle blocks
-                {
-                    newObj = Instantiate(_levelBoardData.UsedObstacleBlocks[Random.Range(0, _levelBoardData.UsedObstacleBlocks.Length)].gameObject, new Vector3(i, j, 0), Quaternion.identity, transform);
-                }
-
-                newBlock = newObj.GetComponent<Block>();
-                SetBlockLoc(newBlock, loc);
+                if (Random.Range(0, 100) < _levelBoardData.coloredBlockChance) { CreateBlock(i, j, BLOCKTYPE.Colored); }
+                else { CreateBlock(i, j, BLOCKTYPE.Obstacle); }
             }
         }
 
         poolSingleton.SortColoredBlockPool();
+    }
+
+    private Block CreateBlock(int x, int y, BLOCKTYPE blockType, bool setLoc = true)
+    {
+        Vector2Int loc = new Vector2Int(x, y);
+        GameObject newObj;
+        Block newBlock;
+        Block[] blocks;
+
+        switch (blockType)
+        {
+            case BLOCKTYPE.Colored:
+                blocks = _levelBoardData.UsedColoredBlocks;
+                break;
+            case BLOCKTYPE.Obstacle:
+                blocks = _levelBoardData.UsedObstacleBlocks;
+                break;
+            default:
+                blocks = null;
+                break;
+        }
+
+        if (blocks == null) { return null; }
+
+        newObj = Instantiate(blocks[Random.Range(0, blocks.Length)].gameObject, new Vector3(x, y, 0), Quaternion.identity, transform);
+        newBlock = newObj.GetComponent<Block>();
+        if (setLoc) { SetBlockLoc(newBlock, loc); }
+        return newBlock;
     }
 
     private void ReCreate()
@@ -153,7 +155,8 @@ public sealed class BoardCreator : MonoBehaviour
 
     private System.Collections.IEnumerator WaitFallingBlocks()
     {
-        yield return new WaitForSeconds(fallDuration + 0.1f); // To Do: test this extra time more
+        float waitTime = BlockAnimator.OneStepTime * _levelBoardData.MaxColumnCount;
+        yield return new WaitForSeconds(waitTime); // To Do: test this more
         IntentionalShuffle();
         FindColoredBlockGroups();
         AssignGroupIDs();
@@ -313,8 +316,8 @@ public sealed class BoardCreator : MonoBehaviour
         SetBlockLoc(adjacent, pos2, false, true);
         SetBlockLoc(mover, pos1, false, true);
 
-        BlockAnimator.AnimateBlockLocationChange(adjacent, pos2);
-        BlockAnimator.AnimateBlockLocationChange(mover, pos1);
+        BlockAnimator.AnimateBlockLocationChange(adjacent, pos1);
+        BlockAnimator.AnimateBlockLocationChange(mover, pos2);
     }
 
     #endregion
@@ -421,7 +424,7 @@ public sealed class BoardCreator : MonoBehaviour
                         Vector2Int newLoc = new Vector2Int(x, lowestAvailableRow);
 
                         SetBlockLoc(currentBlock, newLoc, true);
-                        BlockAnimator.AnimateBlockLocationChange(currentBlock, newLoc);
+                        BlockAnimator.AnimateBlockLocationChange(currentBlock, new Vector2Int(x, y));
                     }
                 }
             }
@@ -453,7 +456,7 @@ public sealed class BoardCreator : MonoBehaviour
     private void CreateMissingBlocksOnColumn(int column)
     {
         int totalRows = _levelBoardData.MaxRowCount;
-        int spawnRow = totalRows + 4;
+        int spawnOffset = totalRows + 2;
         int missingBlockCount = 0;
 
         // Count missing blocks starting from the topmost empty row
@@ -471,21 +474,22 @@ public sealed class BoardCreator : MonoBehaviour
 
         for (int i = 0; i < missingBlockCount; i++)
         {
-            spawnRow = spawnRow + i;
+            int spawnRow = spawnOffset + i;
             int targetRow = totalRows - missingBlockCount + i;
             Vector2Int targetLoc = new Vector2Int(column, targetRow);
 
             // To Do: Bottom two lines will be changed after pool
-            GameObject newObj = Instantiate(_levelBoardData.UsedColoredBlocks[Random.Range(0, _levelBoardData.UsedColoredBlocks.Length)].gameObject, new Vector3(column, spawnRow, 0), Quaternion.identity, transform);
-            Block newBlock = newObj.GetComponent<Block>();
+            Block newBlock = CreateBlock(column, spawnRow, BLOCKTYPE.Colored, false);
             SetBlockLoc(newBlock, targetLoc);
 
             BlockAnimator.AnimateBlockCreation(newBlock);
-            BlockAnimator.AnimateBlockLocationChange(newBlock, new Vector2(column, targetRow), fallDuration);
+            BlockAnimator.AnimateBlockLocationChange(newBlock, new Vector2Int(column, spawnRow));
         }
     }
 
     #endregion
+
+    #region Helpers
 
     private void SetBlockLoc(Block block, Vector2Int newLoc, bool removeOld = false, bool doesSwap = false) // Does fall variable is just used for blocks that are already in the board and will fall under. Do not set it to true in case of creation of missing blocks
     {
@@ -526,7 +530,7 @@ public sealed class BoardCreator : MonoBehaviour
         _board[loc.x, loc.y] = null;
     }
 
-    #region Helpers
+    
 
     public struct BlockGroup // Basically, a group is a list of blocks with a groupID
     {

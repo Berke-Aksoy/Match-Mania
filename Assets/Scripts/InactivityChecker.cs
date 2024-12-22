@@ -42,11 +42,11 @@ public class InactivityChecker : MonoBehaviour
     private IEnumerator HighlightRandomBlockGroup()
     {
         isHighlighting = true;
-        int totalGroupCount = BoardCreator.Singleton.BlockGroups.Count;
+        int totalGroupCount = BoardCreator.Instance.BlockGroups.Count;
 
         if (totalGroupCount > 0)
         {
-            Block[] blocks = BoardCreator.Singleton.BlockGroups[Random.Range(0, totalGroupCount)].Blocks.ToArray();
+            Block[] blocks = BoardCreator.Instance.BlockGroups[Random.Range(0, totalGroupCount)].Blocks.ToArray();
             Tween[] tweens = new Tween[blocks.Length];
 
             for(int i = 0; i < blocks.Length; i++)
