@@ -37,10 +37,15 @@ namespace MatchMania.Blocks
             AudioManager.Instance.PlaySound(Data.BlastSound[Random.Range(0, Data.BlastSound.Length)], volume);
         }
 
+        public void OnOffCollider(bool value)
+        {
+            _boxCollider2D.enabled = value;
+        }
+
         public void Moving(float moveDuration)
         {
             _isMoving = true;
-            _boxCollider2D.enabled = false;
+            OnOffCollider(false);
             StartCoroutine(ResetMoving(moveDuration));
         }
 
@@ -48,7 +53,12 @@ namespace MatchMania.Blocks
         {
             yield return new WaitForSeconds(moveDuration);
             _isMoving = false;
-            _boxCollider2D.enabled = true;
+            OnOffCollider(true);
+        }
+
+        private void OnDestroy()
+        {
+            Tween.Kill();
         }
     }
 }

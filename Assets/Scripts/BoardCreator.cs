@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using MatchMania.Blocks;
 using static BlockData;
+using UnityEngine.InputSystem.Android;
 
 public sealed class BoardCreator : BaseSingleton<BoardCreator>
 {
@@ -18,10 +19,12 @@ public sealed class BoardCreator : BaseSingleton<BoardCreator>
 
     private Dictionary<Vector2Int, ColoredBlock> _coloredBlocks = new Dictionary<Vector2Int, ColoredBlock>();
     private Dictionary<Vector2Int, ObstacleBlock> _obstacleBlocks = new Dictionary<Vector2Int, ObstacleBlock>();
+    private float[] missingTimers;
 
     private void Start()
     {
         _levelBoardData = LevelManager.Instance.GetLevelData();
+        missingTimers = new float[_levelBoardData.MaxColumnCount];
         CreateBoard(_levelBoardData.MaxRowCount, _levelBoardData.MaxColumnCount);
         FindColoredBlockGroups();
         AssignGroupIDs();
@@ -70,16 +73,6 @@ public sealed class BoardCreator : BaseSingleton<BoardCreator>
         newBlock = newObj.GetComponent<Block>();
         if (setLoc) { SetBlockLoc(newBlock, loc); }
         return newBlock;
-    }
-
-    private void ReCreate()
-    {
-        foreach(Block block in _board)
-        {
-            Destroy(block);
-        }
-
-        CreateBoard(_levelBoardData.MaxRowCount, _levelBoardData.MaxColumnCount);
     }
 
     #region Grouping Mechanic
@@ -155,7 +148,7 @@ public sealed class BoardCreator : BaseSingleton<BoardCreator>
 
     private System.Collections.IEnumerator WaitFallingBlocks()
     {
-        float waitTime = BlockAnimator.OneStepTime * _levelBoardData.MaxColumnCount;
+        float waitTime = BlockAnimator.OneStepTime * (_levelBoardData.MaxColumnCount + 1);
         yield return new WaitForSeconds(waitTime); // To Do: test this more
         IntentionalShuffle();
         FindColoredBlockGroups();
@@ -456,7 +449,8 @@ public sealed class BoardCreator : BaseSingleton<BoardCreator>
     private void CreateMissingBlocksOnColumn(int column)
     {
         int totalRows = _levelBoardData.MaxRowCount;
-        int spawnOffset = totalRows + 2;
+        int extraSteps = 2;
+        int spawnOffset = totalRows + extraSteps;
         int missingBlockCount = 0;
 
         // Count missing blocks starting from the topmost empty row
@@ -472,6 +466,8 @@ public sealed class BoardCreator : BaseSingleton<BoardCreator>
             }
         }
 
+        if (missingTimers[column] > 0) { spawnOffset += Mathf.RoundToInt(missingTimers[column] / BlockAnimator.OneStepTime); }
+
         for (int i = 0; i < missingBlockCount; i++)
         {
             int spawnRow = spawnOffset + i;
@@ -484,6 +480,18 @@ public sealed class BoardCreator : BaseSingleton<BoardCreator>
 
             BlockAnimator.AnimateBlockCreation(newBlock);
             BlockAnimator.AnimateBlockLocationChange(newBlock, new Vector2Int(column, spawnRow));
+        }
+
+        missingTimers[column] = BlockAnimator.OneStepTime * missingBlockCount;
+    }
+
+    private void FixedUpdate()
+    {
+        for(int i=0; i<missingTimers.Length; i++)
+        {
+            float timer = missingTimers[i];
+            if (timer > 0)
+                missingTimers[i] = timer - Time.fixedDeltaTime;
         }
     }
 
