@@ -5,7 +5,7 @@ namespace MatchMania.Blocks
 {
     public static class BlockAnimator
     {
-        [SerializeField] private static float _oneStepTime = 0.3f; // The duration to take one step
+        [SerializeField] private static float _oneStepTime = 0.25f; // The duration to take one step
         public static float OneStepTime { get => _oneStepTime; }
         public static void ShakeBlock(Block block, float duration = 0.5f)
         {
@@ -23,7 +23,7 @@ namespace MatchMania.Blocks
 
         public static void AnimateBlockLocationChange(Block block, Vector2Int startPosition)
         {
-            int stepCount = Mathf.Abs(startPosition.y - block.Location.y);
+            int stepCount = Mathf.Max(Mathf.Abs(startPosition.x - block.Location.x), Mathf.Abs(startPosition.y - block.Location.y));
             float duration = stepCount * _oneStepTime;
 
             if (block.IsMoving) { duration += GetRemainingTime(block.Tween); }

@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using MatchMania.Blocks;
 using static BlockData;
-using UnityEngine.InputSystem.Android;
 
 public sealed class BoardCreator : BaseSingleton<BoardCreator>
 {
@@ -148,7 +147,7 @@ public sealed class BoardCreator : BaseSingleton<BoardCreator>
 
     private System.Collections.IEnumerator WaitFallingBlocks()
     {
-        float waitTime = BlockAnimator.OneStepTime * (_levelBoardData.MaxColumnCount + 1);
+        float waitTime = Mathf.Max(1f, BlockAnimator.OneStepTime * (_levelBoardData.MaxColumnCount));
         yield return new WaitForSeconds(waitTime); // To Do: test this more
         IntentionalShuffle();
         FindColoredBlockGroups();
@@ -179,7 +178,7 @@ public sealed class BoardCreator : BaseSingleton<BoardCreator>
         if(uniqueColorCount < 1)
         {   
             if(uniqueColorCount == 0) { WipeOutObstacles(); return false; } // In this case the map is full of obstacles that's why we need to wipe them out
-            return CreateNewBlockAndReplaceOne(groupedBlocks, uniqueColorCount); // If there is one type of color and we couldn't make them group that means they are surrounded by obstacles
+            return CreateNewBlockAndReplaceOne(); // If there is one type of color and we couldn't make them group that means they are surrounded by obstacles
         }
 
         while (tryCount < uniqueColorCount)
@@ -208,10 +207,10 @@ public sealed class BoardCreator : BaseSingleton<BoardCreator>
             tryCount++;
         }
 
-        return CreateNewBlockAndReplaceOne(groupedBlocks, uniqueColorCount);
+        return CreateNewBlockAndReplaceOne();
     }
 
-    private bool CreateNewBlockAndReplaceOne(List<List<ColoredBlock>> groupedBlocks, int uniqueColorCount)
+    private bool CreateNewBlockAndReplaceOne()
     {
         foreach (KeyValuePair<Vector2Int, ColoredBlock> kvp in _coloredBlocks)
         {
@@ -283,15 +282,7 @@ public sealed class BoardCreator : BaseSingleton<BoardCreator>
             if (IsWithinBounds(adjacentLoc)) // Obstacle blocks are not swappable
             {
                 Block block = _board[adjacentLoc.x, adjacentLoc.y];
-                if (block == null) // Check this if block not to place the block in mid air
-                {
-                    Vector2Int underAdjacentLoc = adjacentLoc + NeighborDirections[1]; // Look under adjacent location
-                    if (IsWithinBounds(underAdjacentLoc) && _board[underAdjacentLoc.x, underAdjacentLoc.y] == null) { continue; } // If adjacent location is in mid air, it is not a valid location
-                }
-                else if(block.Data.BlockType == BLOCKTYPE.Obstacle)
-                {
-                    continue;
-                }
+                if (block == null || block.Data.BlockType == BLOCKTYPE.Obstacle) { continue; }
 
                 validLocs.Add(adjacentLoc);
             }
@@ -501,7 +492,7 @@ public sealed class BoardCreator : BaseSingleton<BoardCreator>
 
     private void SetBlockLoc(Block block, Vector2Int newLoc, bool removeOld = false, bool doesSwap = false) // Does fall variable is just used for blocks that are already in the board and will fall under. Do not set it to true in case of creation of missing blocks
     {
-        if (!IsWithinBounds(newLoc)) { return; }
+        if (!IsWithinBounds(newLoc) || block == null) { return; }
 
         BLOCKTYPE blockType = block.Data.BlockType;
         Vector2Int oldLoc = block.Location;
