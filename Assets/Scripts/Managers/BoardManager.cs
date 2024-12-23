@@ -41,17 +41,17 @@ public class BoardManager : BaseSingleton<BoardManager>
         {
             for (int j = 0; j < rowCount; j++)
             {
-                if (Random.Range(0, 100) < GetBlockChances()[0]) { CreateBlock(i, j, BLOCKTYPE.Colored); }
-                else { CreateBlock(i, j, BLOCKTYPE.Obstacle); }
+                if (Random.Range(0, 100) < GetBlockChances()[0]) { CreateBlock(i, j, BLOCKTYPE.Colored, true, true); }
+                else { CreateBlock(i, j, BLOCKTYPE.Obstacle, true, true); }
             }
         }
     }
 
-    public Block CreateBlock(int x, int y, BLOCKTYPE blockType, bool setLoc = true)
+    public Block CreateBlock(int x, int y, BLOCKTYPE blockType, bool setLoc = true, bool isInit = false)
     {
         Vector2Int loc = new Vector2Int(x, y);
         GameObject newObj;
-        Block newBlock;
+        Block newBlock = null;
         Block[] blocks;
 
         switch (blockType)
@@ -69,9 +69,23 @@ public class BoardManager : BaseSingleton<BoardManager>
 
         if (blocks == null) { return null; }
 
-        newObj = Instantiate(blocks[Random.Range(0, blocks.Length)].gameObject, new Vector3(x, y, 0), Quaternion.identity, transform);
-        newBlock = newObj.GetComponent<Block>();
+        if (!isInit)
+        {
+            newBlock = BlockPool.Instance.TryGetPooledBlock();
+        }
+
+        if (newBlock == null)
+        {
+            newObj = Instantiate(blocks[Random.Range(0, blocks.Length)].gameObject, new Vector3(x, y, 0), Quaternion.identity, transform);
+            newBlock = newObj.GetComponent<Block>();
+        }
+        else
+        {
+            newBlock.transform.position = new Vector3(x, y, 0);
+        }
+
         if (setLoc) { SetBlockLoc(newBlock, loc); }
+
         return newBlock;
     }
 
@@ -117,7 +131,7 @@ public class BoardManager : BaseSingleton<BoardManager>
     public void DestroyBlock(Block blockToDestroy)
     {
         RemoveBlock(blockToDestroy.Location, blockToDestroy.Data.BlockType);
-        Destroy(blockToDestroy.gameObject);
+        BlockPool.Instance.BlockToPool(blockToDestroy);
     }
 
     public void SwapBlocks(Vector2Int pos1, Vector2Int pos2)

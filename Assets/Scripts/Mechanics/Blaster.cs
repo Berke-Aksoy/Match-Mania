@@ -5,11 +5,11 @@ using UnityEngine;
 using static BlockData;
 using static GroupManager;
 
-public class Blaster : MonoBehaviour
+public static class Blaster
 {
     public static event Action OnBlastComplete;
 
-    public bool BlastGroup(int groupID)
+    public static bool BlastGroup(int groupID)
     {
         BoardManager boardManager = BoardManager.Instance;
         GroupManager groupManager = GroupManager.Instance;
@@ -32,7 +32,7 @@ public class Blaster : MonoBehaviour
         return true;
     }
 
-    private bool IsBlastable(BlockGroup blastGroup) // Updates the status of the group variable HasMovingPiece
+    private static bool IsBlastable(BlockGroup blastGroup) // Updates the status of the group variable HasMovingPiece
     {
         foreach (Block block in blastGroup.Blocks)
         {
@@ -42,7 +42,7 @@ public class Blaster : MonoBehaviour
         return true;
     }
 
-    private void DamageAdjacentObstacles(Dictionary<Vector2Int, ObstacleBlock> obstaclesToDamage)
+    private static void DamageAdjacentObstacles(Dictionary<Vector2Int, ObstacleBlock> obstaclesToDamage)
     {
         BoardManager boardManager = BoardManager.Instance;
         Dictionary<Vector2Int, ObstacleBlock>.Enumerator pointer = obstaclesToDamage.GetEnumerator();

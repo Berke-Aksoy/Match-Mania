@@ -13,8 +13,7 @@ namespace MatchMania.Blocks
         {
             if (_groupID == -1) { BlockAnimator.ShakeBlock(this); return; }
 
-            Blaster blaster = GetComponentInParent<Blaster>();
-            if (blaster.BlastGroup(_groupID))
+            if (Blaster.BlastGroup(_groupID))
             {
                 PlayBlastSound();
             }
