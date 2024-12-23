@@ -16,6 +16,7 @@ public class BlockData : ScriptableObject
 
     public BLOCKTYPE BlockType;
     public COLORTYPE ColorType = COLORTYPE.None;
+    public bool UseGravity = true;
     public AudioClip[] BlastSound;
 
     [Tooltip("The order is important. If block type is; Colored=> 0:A, 1:B, 2:C, 3:Default. Obstacle => Put other versions's icons according to health")] public Sprite[] IconSprites;

@@ -2,6 +2,7 @@ using DG.Tweening;
 using System.Collections;
 using UnityEngine;
 using MatchMania.Blocks;
+using System.Collections.Generic;
 
 public class InactivityChecker : MonoBehaviour
 {
@@ -42,11 +43,12 @@ public class InactivityChecker : MonoBehaviour
     private IEnumerator HighlightRandomBlockGroup()
     {
         isHighlighting = true;
-        int totalGroupCount = BoardCreator.Instance.BlockGroups.Count;
+        List<GroupManager.BlockGroup> blockGroups = GroupManager.Instance.BlockGroups;
+        int totalGroupCount = GroupManager.Instance.BlockGroups.Count;
 
         if (totalGroupCount > 0)
         {
-            Block[] blocks = BoardCreator.Instance.BlockGroups[Random.Range(0, totalGroupCount)].Blocks.ToArray();
+            Block[] blocks = blockGroups[Random.Range(0, totalGroupCount)].Blocks.ToArray();
             Tween[] tweens = new Tween[blocks.Length];
 
             for(int i = 0; i < blocks.Length; i++)

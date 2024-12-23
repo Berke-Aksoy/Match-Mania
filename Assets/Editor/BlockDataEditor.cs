@@ -8,12 +8,14 @@ public class BlockDataEditor : Editor
     SerializedProperty colorTypeProperty;
     SerializedProperty iconSpritesProperty;
     SerializedProperty blastSoundProperty;
+    SerializedProperty UseGravityProperty;
 
     private void OnEnable()
     {
         blockTypeProperty = serializedObject.FindProperty("BlockType");
         colorTypeProperty = serializedObject.FindProperty("ColorType");
         iconSpritesProperty = serializedObject.FindProperty("IconSprites");
+        UseGravityProperty = serializedObject.FindProperty("UseGravity");
         blastSoundProperty = serializedObject.FindProperty("BlastSound");
     }
 
@@ -23,6 +25,7 @@ public class BlockDataEditor : Editor
 
         EditorGUILayout.PropertyField(blockTypeProperty);
         EditorGUILayout.PropertyField(colorTypeProperty);
+        EditorGUILayout.PropertyField(UseGravityProperty);
         EditorGUILayout.PropertyField(blastSoundProperty);
 
         // Check if BlockType is 'Power' to conditionally draw IconSprites

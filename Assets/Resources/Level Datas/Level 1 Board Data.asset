@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6ad9ebfd66e794349957280cf55a57cd, type: 3}
   m_Name: Level 1 Board Data
   m_EditorClassIdentifier: 
-  MaxRowCount: 10
-  MaxColumnCount: 10
-  obstacleBlockChance: 88
-  coloredBlockChance: 12
+  MaxRowCount: 2
+  MaxColumnCount: 2
+  obstacleBlockChance: 15
+  coloredBlockChance: 85
   powerBlockChance: 0
   UsedColoredBlocks:
   - {fileID: 4755630860766356898, guid: feef49a1ac70d09488ba53f6ca5f696d, type: 3}

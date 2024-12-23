@@ -18,6 +18,7 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 200b84a9027448040ae08454dcb2ce80, type: 3}
   - {fileID: 8300000, guid: 35ac6cf21adfda34e969f741a267c9a9, type: 3}
   - {fileID: 8300000, guid: b78080233149c5d408341c5932d387c1, type: 3}
+  UseGravity: 0
   IconSprites:
   - {fileID: 21300000, guid: da49a52c2d230fc478c123171bc4b4cd, type: 3}
   - {fileID: 21300000, guid: 03e151ee2c41bd14cb37eb7aecc85913, type: 3}

@@ -8,12 +8,13 @@ namespace MatchMania.Blocks
         [SerializeField] private static int _condA = 4;  // Condition A
         [SerializeField] private static int _condB = 6; // Condition B
         [SerializeField] private static int _condC = 8;  // Condition C
-        public void OnInteract()
+
+        public void Interact()
         {
             if (_groupID == -1) { BlockAnimator.ShakeBlock(this); return; }
 
-            BoardCreator boardCreator = GetComponentInParent<BoardCreator>();
-            if (boardCreator.BlastGroup(_groupID))
+            Blaster blaster = GetComponentInParent<Blaster>();
+            if (blaster.BlastGroup(_groupID))
             {
                 PlayBlastSound();
             }
@@ -36,7 +37,7 @@ namespace MatchMania.Blocks
 
         private void OnMouseDown()
         {
-            OnInteract();
+            Interact();
         }
     }
 }
