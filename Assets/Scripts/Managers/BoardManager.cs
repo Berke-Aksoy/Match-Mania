@@ -29,6 +29,7 @@ public class BoardManager : BaseSingleton<BoardManager>
     {
         int[] dimensions = GetBoardDimensions();
         CreateBoard(dimensions[0], dimensions[1]);
+        GroupManager groupManager = GroupManager.Instance; // This code ensures that GroupManager exists in the game.
         OnBoardComplete?.Invoke();
     }
 
@@ -40,7 +41,7 @@ public class BoardManager : BaseSingleton<BoardManager>
         {
             for (int j = 0; j < rowCount; j++)
             {
-                if (UnityEngine.Random.Range(0, 100) < GetBlockChances()[0]) { CreateBlock(i, j, BLOCKTYPE.Colored); }
+                if (Random.Range(0, 100) < GetBlockChances()[0]) { CreateBlock(i, j, BLOCKTYPE.Colored); }
                 else { CreateBlock(i, j, BLOCKTYPE.Obstacle); }
             }
         }
