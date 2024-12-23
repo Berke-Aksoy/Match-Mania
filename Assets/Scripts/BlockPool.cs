@@ -1,73 +1,48 @@
 using System.Collections.Generic;
 using UnityEngine;
 using MatchMania.Blocks;
+using static BlockData;
+using System.Linq;
 
-public class BlockPool : MonoBehaviour
+public class BlockPool : BaseSingleton<BlockPool>
 {
-    private static BlockPool _instance;
-    public static BlockPool Singleton { get => _instance; }
+    private static Dictionary<COLORTYPE, List<ColoredBlock>> _blocksGroupedByColor = new Dictionary<COLORTYPE, List<ColoredBlock>>();
 
-    private static Dictionary<BlockData.COLORTYPE, Queue<ColoredBlock>> _blockPoolByColor = new Dictionary<BlockData.COLORTYPE, Queue<ColoredBlock>>();
-    private static List<ColoredBlock> _coloredBlockPool = new List<ColoredBlock>();
-
-    private void Awake()
+    private void OnEnable()
     {
-        if (_instance == null)
+        BoardManager.OnBoardComplete += StoreColoredBlocksToPool;
+    }
+
+    private void OnDisable()
+    {
+        BoardManager.OnBoardComplete -= StoreColoredBlocksToPool;
+    }
+
+    public void StoreColoredBlocksToPool()
+    {
+        List<List<ColoredBlock>> _coloredPool = BoardManager.Instance.GroupBlocksByColor();
+        _blocksGroupedByColor = _coloredPool.Select((coloredBlocks, index) => new { ColorType = (COLORTYPE)index, ColoredBlocks = coloredBlocks })
+                                            .ToDictionary(item => item.ColorType, item => item.ColoredBlocks);
+    }
+
+    public ColoredBlock GetPooledBlock(COLORTYPE color)
+    {
+        List<ColoredBlock> blocks = _blocksGroupedByColor.GetValueOrDefault(color);
+        if (blocks != null)
         {
-            _instance = this;
+            ColoredBlock poppedBlock = blocks[blocks.Count - 1];
+            blocks.RemoveAt(blocks.Count - 1);
+            return poppedBlock;
         }
         else
         {
-            Destroy(gameObject);
+            return null;
         }
     }
 
-    public void StoreColoredBlockToPool(ColoredBlock coloredBlock)
+    public void BlockToPool(Block block)
     {
-        if(coloredBlock == null) { return; }
-
-        _coloredBlockPool.Add(coloredBlock);
+        _blocksGroupedByColor.GetValueOrDefault(block.Data.ColorType)?.Add((ColoredBlock)block);
     }
 
-    public void SortColoredBlockPool()
-    {
-        Queue<ColoredBlock> blueBlocks = new Queue<ColoredBlock>();
-        Queue<ColoredBlock> greenBlocks = new Queue<ColoredBlock>();
-        Queue<ColoredBlock> pinkBlocks = new Queue<ColoredBlock>();
-        Queue<ColoredBlock> purpleBlocks = new Queue<ColoredBlock>();
-        Queue<ColoredBlock> redBlocks = new Queue<ColoredBlock>();
-        Queue<ColoredBlock> yellowBlocks = new Queue<ColoredBlock>();
-
-        foreach (ColoredBlock block in _coloredBlockPool)
-        {
-            switch(block.Data.ColorType)
-            {
-                case BlockData.COLORTYPE.Blue: blueBlocks.Enqueue(block); break;
-                case BlockData.COLORTYPE.Green: greenBlocks.Enqueue(block);break;
-                case BlockData.COLORTYPE.Pink: pinkBlocks.Enqueue(block); break;
-                case BlockData.COLORTYPE.Purple: purpleBlocks.Enqueue(block); break;
-                case BlockData.COLORTYPE.Red: redBlocks.Enqueue(block); break;
-                case BlockData.COLORTYPE.Yellow: yellowBlocks.Enqueue(block); break;
-            }
-        }
-
-        _blockPoolByColor.Add(BlockData.COLORTYPE.Blue, blueBlocks);
-        _blockPoolByColor.Add(BlockData.COLORTYPE.Green, greenBlocks);
-        _blockPoolByColor.Add(BlockData.COLORTYPE.Pink, pinkBlocks);
-        _blockPoolByColor.Add(BlockData.COLORTYPE.Purple, purpleBlocks);
-        _blockPoolByColor.Add(BlockData.COLORTYPE.Red, redBlocks);
-        _blockPoolByColor.Add(BlockData.COLORTYPE.Yellow, yellowBlocks);
-
-    }
-
-    public GameObject GetPooledBlock(BlockData.COLORTYPE color)
-    {
-        //blockPoolByColor.GetValueOrDefault(color);
-        return null;
-    }
-
-    public void ClearPools()
-    {
-        
-    }
 }
